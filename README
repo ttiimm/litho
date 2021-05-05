@@ -1,5 +1,4 @@
 # Litho
-
 As a parent of two young children, I use Google photos extensibly to back up and make 
 all my photos easily accesible on all devices and to share with family and friends.
 I've never been a fan of sharing on social media, so appreciate having an easy to use
@@ -17,7 +16,6 @@ complex enough to expose me to a variety of technical challenges, but nothing to
 aside from the expected fights with the compiler :D
 
 ## What works
-
 The project is currently in development and so far I've mostly been working on getting 
 something working end-to-end.
 
@@ -32,7 +30,6 @@ it, and proceeding to start downloading.
 Next I'll work on an efficient way to track and download content from the service. 
 
 ## Building it
-
 I will eventually publish some binaries of the application, but for now if you want to try it you
 have to build it yourself.
 
