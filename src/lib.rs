@@ -1,11 +1,16 @@
 use base64::encode_config;
 use rand::Rng;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use simple_server;
 
+
+use std::fs::File;
+use std::path::Path;
 use std::sync::{mpsc, Mutex};
 use std::thread;
+use std::vec::Vec;
 
 
 const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
@@ -13,8 +18,14 @@ const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
     0123456789-.~_";
 
 
+type Result<T> = std::result::Result<T, Error>;
+
+
 #[derive(Debug, Clone)]
-pub struct TokenError;
+pub enum Error{
+    SerError,
+    FetchError
+}
 
 
 pub struct TokenFetcher<'a> {
@@ -25,6 +36,37 @@ pub struct TokenFetcher<'a> {
     redirect_uri: String,
     refresh_uri: &'a str,
 }
+
+
+pub struct MediaFetcher {
+
+}
+
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Album {
+    media_items: Vec<Media>
+}
+
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Media {
+    base_url: String,
+    filename: String
+}
+
+
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Error {
+        // XXX: need to map the errors so that the underlying failure message
+        // can be used
+        print!("Err {}", err);
+        Error::SerError
+    }
+}
+
 
 impl<'a> TokenFetcher<'a> {
     const HOST: &'static str = "localhost";
@@ -93,7 +135,7 @@ impl<'a> TokenFetcher<'a> {
 
     fn stop(&self) {}
 
-    pub fn fetch_refresh(&self) -> Result<String, TokenError> {
+    pub fn fetch_refresh(&self) -> Result<String> {
         let (tx, rx) = mpsc::channel();
         self.start(tx);
         println!(
@@ -112,7 +154,7 @@ impl<'a> TokenFetcher<'a> {
                 "refresh_token")
     }
 
-    pub fn fetch_access(&self, refresh_token: &str) -> Result<String, TokenError> {
+    pub fn fetch_access(&self, refresh_token: &str) -> Result<String> {
         self.refresh(
             [("client_id", &self.client_id),
              ("client_secret", &self.client_secret),
@@ -123,7 +165,7 @@ impl<'a> TokenFetcher<'a> {
             "access_token")
     }
 
-    fn refresh(&self, params: [(&str, &str); 6], field: &str) -> Result<String, TokenError> {
+    fn refresh(&self, params: [(&str, &str); 6], field: &str) -> Result<String> {
         // println!("params={:?}", params);
         let client = reqwest::blocking::Client::new();
         let request = client.post(self.refresh_uri)
@@ -138,11 +180,10 @@ impl<'a> TokenFetcher<'a> {
                 // println!("refresh_value={}", value);
                 Ok(String::from(value))
             },
-            Err(_) => Err(TokenError),
+            Err(_) => Err(Error::FetchError),
         }
     }
 }
-
 
 
 fn extract_code<T>(request: simple_server::Request<T>) -> Option<String> {
@@ -181,4 +222,42 @@ fn test_extract_code_missing() {
         .body(())
         .unwrap();
     extract_code(request);
+}
+
+
+impl MediaFetcher {
+
+    pub fn new() -> MediaFetcher {
+        MediaFetcher {
+
+        }
+    }
+
+    pub fn fetch_media(&self, access_token: &str) -> Result<Album> {
+        let client = reqwest::blocking::Client::new();
+        let album_response = client
+            .get("https://photoslibrary.googleapis.com/v1/mediaItems")
+            .header("Authorization", format!("Bearer {}", access_token).as_str())
+            .query(&[("pageSize", "1")])
+            .send()
+            .unwrap()
+            .text()
+            .unwrap();
+        //  println!("album={}", album_response);
+        let album: Album = serde_json::from_str(&album_response)?;
+        Ok(album)
+    }
+
+    pub fn write_pic(&self, album: Album) -> Result<u64> {
+        let media = &album.media_items[0];
+        let path = Path::new(&media.filename);
+        let mut file = File::create(path).unwrap();
+        match reqwest::blocking::get(&media.base_url) {
+            Err(_) => Err(Error::FetchError),
+            Ok(mut response) => {
+                let file_len = response.copy_to(&mut file).unwrap();
+                Ok(file_len)
+            }
+        }
+    }
 }
