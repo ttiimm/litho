@@ -23,9 +23,10 @@ fn main() -> Result<(), litho::Error> {
     });
 
     let access_token = token_fetcher.fetch_access(&refresh_token.unwrap()).unwrap();
-    let media_fetcher = litho::MediaFetcher::new();
-    let album = media_fetcher.fetch_media(&access_token)?;
-    media_fetcher.write_pic(album).unwrap();
+    let media_fetcher = litho::MediaFetcher::new(
+        "https://photoslibrary.googleapis.com", &access_token);
+    let album = media_fetcher.fetch_media()?;
+    media_fetcher.write_pics(album).unwrap();
     Ok(())
 }
 

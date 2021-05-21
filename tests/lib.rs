@@ -55,3 +55,28 @@ fn test_fetch_access() {
     mock.assert();
     assert_eq!("youraccesstoken", result)
 }
+
+#[test]
+fn test_fetch_media() {
+    let server = MockServer::start();
+
+    let mock = server.mock(|when, then| {
+        when.method(GET)
+            .path("/v1/mediaItems")
+            .query_param("pageSize", "1")
+            .header("Authorization", "Bearer myaccesstoken");
+        then.status(200)
+            .header("Content-Type", "application/json")
+            .json_body(json!({"mediaItems": [
+                {"baseUrl": "myurl",
+                 "filename": "foo"}]}));
+    });
+
+    let mock_endpoint = server.url("");
+    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken");
+    let result: litho::Album = mf.fetch_media().unwrap();
+
+    mock.assert();
+    assert_eq!("foo", result.media_items[0].filename);
+    assert_eq!("myurl", result.media_items[0].base_url)
+}

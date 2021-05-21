@@ -38,23 +38,24 @@ pub struct TokenFetcher<'a> {
 }
 
 
-pub struct MediaFetcher {
-
+pub struct MediaFetcher<'a> {
+    base_uri: &'a str,
+    access_token: &'a str,
 }
 
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Album {
-    media_items: Vec<Media>
+    pub media_items: Vec<Media>
 }
 
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Media {
-    base_url: String,
-    filename: String
+    pub base_url: String,
+    pub filename: String
 }
 
 
@@ -225,30 +226,33 @@ fn test_extract_code_missing() {
 }
 
 
-impl MediaFetcher {
+impl<'a> MediaFetcher<'a> {
 
-    pub fn new() -> MediaFetcher {
+    pub fn new(base_uri: &'a str, access_token: &'a str) -> MediaFetcher<'a> {
         MediaFetcher {
-
+            base_uri,
+            access_token
         }
     }
 
-    pub fn fetch_media(&self, access_token: &str) -> Result<Album> {
+    pub fn fetch_media(&self) -> Result<Album> {
         let client = reqwest::blocking::Client::new();
-        let album_response = client
-            .get("https://photoslibrary.googleapis.com/v1/mediaItems")
-            .header("Authorization", format!("Bearer {}", access_token).as_str())
+        let uri = format!("{}/v1/mediaItems", self.base_uri);
+        // println!("self.access_token={}", self.access_token);
+        let bearer_token = format!("Bearer {}", self.access_token);
+        let album_response = client.get(uri)
+            .header("Authorization", bearer_token.as_str())
             .query(&[("pageSize", "1")])
             .send()
             .unwrap()
             .text()
             .unwrap();
-        //  println!("album={}", album_response);
+        // println!("album={}", album_response);
         let album: Album = serde_json::from_str(&album_response)?;
         Ok(album)
     }
 
-    pub fn write_pic(&self, album: Album) -> Result<u64> {
+    pub fn write_pics(&self, album: Album) -> Result<u64> {
         let media = &album.media_items[0];
         let path = Path::new(&media.filename);
         let mut file = File::create(path).unwrap();
