@@ -1,7 +1,11 @@
 use httpmock::MockServer;
 use httpmock::Method::*;
 use serde_json::json;
+use tempfile::NamedTempFile;
 
+use std::env;
+use std::fs::File;
+use std::io::Read;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -57,7 +61,7 @@ fn test_fetch_access() {
 }
 
 #[test]
-fn test_fetch_media() {
+fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start();
 
     let mock = server.mock(|when, then| {
@@ -73,10 +77,51 @@ fn test_fetch_media() {
     });
 
     let mock_endpoint = server.url("");
-    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken");
+    let cwd = env::current_dir()?;
+    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", &cwd);
     let result: litho::Album = mf.fetch_media().unwrap();
 
     mock.assert();
     assert_eq!("foo", result.media_items[0].filename);
-    assert_eq!("myurl", result.media_items[0].base_url)
+    assert_eq!("myurl", result.media_items[0].base_url);
+    Ok(())
+}
+
+#[test]
+fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
+    let server = MockServer::start();
+    let binary_content = b"\xca\xfe\xba\xbe";
+
+    let mock = server.mock(|when, then| {
+        when.method(GET)
+            .path("/v1/mediaItems/123");
+        then.status(200)
+            .body(binary_content);
+    });
+
+    let file = NamedTempFile::new()?;
+    let temp_path =  file.path();
+    let mut temp_path_buf = temp_path.parent().unwrap().to_path_buf();
+    let mock_endpoint = server.url("");
+    let media_fetcher = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", &temp_path_buf);
+    let mut media_items = Vec::new();
+    let mock_base_url = server.url("/v1/mediaItems/123");
+    let media_item = litho::Media{
+        base_url: mock_base_url,
+        filename: String::from("test.jpg")
+    };
+    media_items.push(media_item);
+    let album = litho::Album{media_items};
+    let result = media_fetcher.write_media(album);
+
+    mock.assert();
+    assert_eq!(4, result.unwrap());
+
+    temp_path_buf.push("test.jpg");
+    let mut file = File::open(temp_path_buf).expect("Unable to open result file");
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).expect("Unable to read the file");
+    let buffer_contents = &buffer.as_ref();
+    assert_eq!(binary_content, buffer_contents);
+    Ok(())
 }

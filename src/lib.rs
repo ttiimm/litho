@@ -5,9 +5,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use simple_server;
 
-
 use std::fs::File;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::vec::Vec;
@@ -24,7 +23,8 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone)]
 pub enum Error{
     SerError,
-    FetchError
+    FetchError,
+    IOError
 }
 
 
@@ -41,6 +41,7 @@ pub struct TokenFetcher<'a> {
 pub struct MediaFetcher<'a> {
     base_uri: &'a str,
     access_token: &'a str,
+    album_dir: &'a PathBuf,
 }
 
 
@@ -228,10 +229,11 @@ fn test_extract_code_missing() {
 
 impl<'a> MediaFetcher<'a> {
 
-    pub fn new(base_uri: &'a str, access_token: &'a str) -> MediaFetcher<'a> {
+    pub fn new(base_uri: &'a str, access_token: &'a str, album_dir: &'a PathBuf) -> MediaFetcher<'a> {
         MediaFetcher {
             base_uri,
-            access_token
+            access_token,
+            album_dir,
         }
     }
 
@@ -252,12 +254,14 @@ impl<'a> MediaFetcher<'a> {
         Ok(album)
     }
 
-    pub fn write_pics(&self, album: Album) -> Result<u64> {
+    pub fn write_media(&self, album: Album) -> Result<u64> {
         let media = &album.media_items[0];
-        let path = Path::new(&media.filename);
-        let mut file = File::create(path).unwrap();
+        let mut path = PathBuf::from(self.album_dir);
+        path.push(&media.filename);
+        // println!("path={}", path.display());
+        let mut file = File::create(path.as_path()).unwrap();
         match reqwest::blocking::get(&media.base_url) {
-            Err(_) => Err(Error::FetchError),
+            Err(_) => Err(Error::IOError),
             Ok(mut response) => {
                 let file_len = response.copy_to(&mut file).unwrap();
                 Ok(file_len)
