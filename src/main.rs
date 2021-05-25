@@ -30,5 +30,3 @@ fn main() -> Result<(), litho::Error> {
     media_fetcher.write_media(album).unwrap();
     Ok(())
 }
-
-

@@ -55,8 +55,18 @@ pub struct Album {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Media {
+    pub id: String,
     pub base_url: String,
-    pub filename: String
+    pub mime_type: String,
+    pub media_metadata: MediaMetadata,
+    pub filename: String,
+}
+
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaMetadata {
+    pub creation_time: String,
 }
 
 
