@@ -254,7 +254,7 @@ impl<'a> MediaFetcher<'a> {
         let bearer_token = format!("Bearer {}", self.access_token);
         let album_response = client.get(uri)
             .header("Authorization", bearer_token.as_str())
-            .query(&[("pageSize", "1")])
+            .query(&[("pageSize", "5")])
             .send()
             .unwrap()
             .text()
@@ -265,11 +265,16 @@ impl<'a> MediaFetcher<'a> {
     }
 
     pub fn write_media(&self, album: Album) -> Result<u64> {
-        let media = &album.media_items[0];
-        let mut path = PathBuf::from(self.album_dir);
-        path.push(&media.filename);
+        let path = PathBuf::from(self.album_dir);
+        let written = album.media_items.iter()
+            .fold(0, |accum, media| accum + self.write_file(&mut path.clone(), media).unwrap());
+        Ok(written)
+    }
+
+    fn write_file(&self, dir: &mut PathBuf, media: &Media) -> Result<u64> {
+        dir.push(&media.filename);
         // println!("path={}", path.display());
-        let mut file = File::create(path.as_path()).unwrap();
+        let mut file = File::create(dir.as_path()).unwrap();
         match reqwest::blocking::get(&media.base_url) {
             Err(_) => Err(Error::IOError),
             Ok(mut response) => {
