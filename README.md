@@ -2,7 +2,7 @@
 As a parent of two young children, I use Google photos extensibly to back up and make 
 all my photos easily accessible on all devices and to share with family and friends.
 I've never been a fan of sharing on social media, so appreciate having an easy to use
-service that let's me maintain privacy.
+service that lets me maintain privacy.
 
 In the last couple years, Google has made it increasingly difficult to easily synchronize 
 photo back ups from their service onto local storage. Their Backup and Sync application 
