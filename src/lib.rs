@@ -48,7 +48,8 @@ pub struct MediaFetcher<'a> {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Album {
-    pub media_items: Vec<Media>
+    pub media_items: Vec<Media>,
+    pub next_page_token: String
 }
 
 
@@ -261,6 +262,7 @@ impl<'a> MediaFetcher<'a> {
             .unwrap();
         // println!("album={}", album_response);
         let album: Album = serde_json::from_str(&album_response)?;
+        println!("album.next_page_token={}", album.next_page_token);
         Ok(album)
     }
 

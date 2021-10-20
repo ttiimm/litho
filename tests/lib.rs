@@ -79,7 +79,8 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
                      "mimeType": "image/jpeg",
                      "mediaMetadata": {
                         "creationTime": "2014-10-02T15:01:23.045123456Z"
-                     }}]
+                     }}],
+                "nextPageToken": "the_next_page"
                 }));
     });
 
@@ -89,6 +90,7 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let result: litho::Album = mf.fetch_media().unwrap();
 
     mock.assert();
+    assert_eq!("the_next_page", result.next_page_token);
     assert_eq!("foo", result.media_items[0].filename);
     assert_eq!("myurl", result.media_items[0].base_url);
     assert_eq!("abc123", result.media_items[0].id);
@@ -139,7 +141,10 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
     };
     media_items.push(test_pic);
     media_items.push(camping_pic);
-    let album = litho::Album{media_items};
+    let album = litho::Album{
+        media_items: media_items, 
+        next_page_token: String::from("the_next_page")
+    };
     let result = media_fetcher.write_media(album);
 
     mock.assert_hits(2);
