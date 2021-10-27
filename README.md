@@ -20,14 +20,15 @@ The project is currently in development and so far I've mostly been working on g
 something working end-to-end.
 
 When run the program checks for a refresh token (stored via [keyring-rs](https://github.com/hwchen/keyring-rs))
-If found, then it uses that to gain an access token and downloads the most recent photo in
+If found, then it uses that to gain an access token and downloads the most recent `n` photo(s) in
 the Google photo account to the current directory.
 
 If no refresh token is available, then it'll ask the user to open the browser to begin granting
 access to the user's Google photos account. This will result in gaining a refresh token, storing
 it, and proceeding to start downloading.
 
-Next I'll work on an efficient way to track and download content from the service. 
+I'm currently working on an efficient way to synchronize the metadata about a user's photo library
+and use that information to back up the media.
 
 ## Building it
 I will eventually publish some binaries of the application, but for now if you want to try it you
@@ -41,3 +42,18 @@ When the application is run, it expects the `CLIENT_ID` and `CLIENT_SECRET` to b
 variables, otherwise it'll panick. When I publish a binary, I'll bake the ones I use into the binary
 but until then, you'll need to obtain some from Google and set them yourself.
 
+When running you can specify the amount of media to download via the `number` argument.
+
+```
+litho 0.1.0
+
+USAGE:
+    litho.exe <number>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+ARGS:
+    <number>
+```

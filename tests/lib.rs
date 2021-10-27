@@ -67,7 +67,7 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let mock = server.mock(|when, then| {
         when.method(GET)
             .path("/v1/mediaItems")
-            .query_param("pageSize", "5")
+            .query_param("pageSize", "3")
             .header("Authorization", "Bearer myaccesstoken");
         then.status(200)
             .header("Content-Type", "application/json")
@@ -87,7 +87,7 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let mock_endpoint = server.url("");
     let cwd = env::current_dir()?;
     let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", &cwd);
-    let result: litho::Album = mf.fetch_media().unwrap();
+    let result: litho::Album = mf.fetch_media(3).unwrap();
 
     mock.assert();
     assert_eq!("the_next_page", result.next_page_token);

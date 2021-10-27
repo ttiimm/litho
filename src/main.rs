@@ -1,9 +1,18 @@
 use std::env;
+use structopt::StructOpt;
 
+
+#[derive(StructOpt)]
+struct Cli {
+    number: u32
+}
 
 fn main() -> Result<(), litho::Error> {
     let client_id = env!("CLIENT_ID");
     let client_secret = env!("CLIENT_SECRET");
+
+    let args = Cli::from_args();
+
     let refresh_uri = "https://oauth2.googleapis.com/token";
     let username = whoami::username();
     let keyring = keyring::Keyring::new(&client_id, &username);
@@ -26,7 +35,7 @@ fn main() -> Result<(), litho::Error> {
     let cwd = env::current_dir().unwrap();
     let media_fetcher = litho::MediaFetcher::new(
         "https://photoslibrary.googleapis.com", &access_token, &cwd);
-    let album = media_fetcher.fetch_media()?;
+    let album = media_fetcher.fetch_media(args.number)?;
     media_fetcher.write_media(album).unwrap();
     Ok(())
 }
