@@ -1,4 +1,5 @@
 use std::env;
+use std::fs;
 use structopt::StructOpt;
 
 
@@ -32,9 +33,11 @@ fn main() -> Result<(), litho::Error> {
     });
 
     let access_token = token_fetcher.fetch_access(&refresh_token.unwrap()).unwrap();
-    let cwd = env::current_dir().unwrap();
+    let mut photos_dir = env::current_dir().unwrap();
+    photos_dir.push("photos");
+    fs::create_dir_all(&photos_dir).unwrap();
     let media_fetcher = litho::MediaFetcher::new(
-        "https://photoslibrary.googleapis.com", &access_token, &cwd);
+        "https://photoslibrary.googleapis.com", &access_token, &photos_dir);
     let album = media_fetcher.fetch_media(args.number)?;
     media_fetcher.write_media(album).unwrap();
     Ok(())
