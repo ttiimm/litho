@@ -80,7 +80,6 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
                      "mediaMetadata": {
                         "creationTime": "2014-10-02T15:01:23.045123456Z"
                      }}],
-                "nextPageToken": "the_next_page"
                 }));
     });
 
@@ -90,10 +89,69 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let result: litho::Album = mf.fetch_media(3).unwrap();
 
     mock.assert();
-    assert_eq!("the_next_page", result.next_page_token);
+    assert_eq!(None, result.next_page_token);
     assert_eq!("foo", result.media_items[0].filename);
     assert_eq!("myurl", result.media_items[0].base_url);
     assert_eq!("abc123", result.media_items[0].id);
+    Ok(())
+}
+
+#[test]
+fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
+    let server = MockServer::start();
+
+    let mock_first = server.mock(|when, then| {
+        when.method(GET)
+            .path("/v1/mediaItems")
+            .query_param("pageSize", "3")
+            .header("Authorization", "Bearer myaccesstoken");
+        then.status(200)
+            .header("Content-Type", "application/json")
+            .json_body(json!({
+                "mediaItems": [
+                    {"id": "abc123",
+                     "baseUrl": "myurl",
+                     "filename": "foo",
+                     "mimeType": "image/jpeg",
+                     "mediaMetadata": {
+                        "creationTime": "2014-10-02T15:01:23.045123456Z"
+                     }}],
+                "nextPageToken": "the_next_page"
+                }));
+    });
+
+    let mock_last = server.mock(|when, then| {
+        when.method(GET)
+            .path("/v1/mediaItems")
+            .query_param("pageSize", "3")
+            .query_param("pageToken", "the_next_page")
+            .header("Authorization", "Bearer myaccesstoken");
+        then.status(200)
+            .header("Content-Type", "application/json")
+            .json_body(json!({
+                "mediaItems": [
+                    {"id": "xyz123",
+                     "baseUrl": "myurl",
+                     "filename": "bar",
+                     "mimeType": "image/jpeg",
+                     "mediaMetadata": {
+                        "creationTime": "2013-10-02T15:01:23.045123456Z"
+                     }}],
+                }));
+    });
+
+    let mock_endpoint = server.url("");
+    let cwd = env::current_dir()?;
+    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", &cwd);
+    let result: litho::Album = mf.fetch_media(3).unwrap();
+
+    mock_first.assert();
+    mock_last.assert();
+    assert_eq!(None, result.next_page_token);
+    assert_eq!("foo", result.media_items[0].filename);
+    assert_eq!("myurl", result.media_items[0].base_url);
+    assert_eq!("abc123", result.media_items[0].id);
+    assert_eq!("bar", result.media_items[1].filename); 
     Ok(())
 }
 
@@ -143,7 +201,7 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
     media_items.push(camping_pic);
     let album = litho::Album{
         media_items: media_items, 
-        next_page_token: String::from("the_next_page")
+        next_page_token: None
     };
     let result = media_fetcher.write_media(album);
 

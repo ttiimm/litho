@@ -49,7 +49,8 @@ pub struct MediaFetcher<'a> {
 #[serde(rename_all = "camelCase")]
 pub struct Album {
     pub media_items: Vec<Media>,
-    pub next_page_token: String
+    #[serde(default)]
+    pub next_page_token: Option<String>
 }
 
 
@@ -248,14 +249,24 @@ impl<'a> MediaFetcher<'a> {
         }
     }
 
-    pub fn fetch_media(&self, num_media: u32) -> Result<Album> {
+    pub fn fetch_media(&self, page_size: u32) -> Result<Album> {
         let client = reqwest::blocking::Client::new();
         let uri = format!("{}/v1/mediaItems", self.base_uri);
         // println!("self.access_token={}", self.access_token);
         let bearer_token = format!("Bearer {}", self.access_token);
+        return self.fetch_next(client, uri, bearer_token, page_size, "".to_string());
+    }
+
+    fn fetch_next(&self, client: reqwest::blocking::Client, uri: String,
+                    bearer_token: String, page_size: u32,
+                    next_page: String) -> Result<Album> {
+        let mut query = vec![("pageSize", page_size.to_string())];
+        if !next_page.is_empty() {
+            query.push(("nextPageToken", next_page));
+        }
         let album_response = client.get(uri)
             .header("Authorization", bearer_token.as_str())
-            .query(&[("pageSize", num_media.to_string())])
+            .query(&query)
             .send()
             .unwrap()
             .text()
