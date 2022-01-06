@@ -254,18 +254,24 @@ impl<'a> MediaFetcher<'a> {
         let uri = format!("{}/v1/mediaItems", self.base_uri);
         // println!("self.access_token={}", self.access_token);
         let bearer_token = format!("Bearer {}", self.access_token);
-        return self.fetch_next(client, uri, bearer_token, page_size, "".to_string());
+        let album = self.fetch_next(&client, &uri, &bearer_token, page_size, None)?;
+        let mut next_album = self.fetch_next(&client, &uri, &bearer_token, page_size, album.next_page_token)?;
+        next_album.media_items.extend(album.media_items.into_iter());
+        return Ok(next_album);
     }
 
-    fn fetch_next(&self, client: reqwest::blocking::Client, uri: String,
-                    bearer_token: String, page_size: u32,
-                    next_page: String) -> Result<Album> {
+    fn fetch_next(&self, client: &reqwest::blocking::Client, uri: &str,
+                    bearer_token: &str, page_size: u32,
+                    next_page: Option<String>) -> Result<Album> {
         let mut query = vec![("pageSize", page_size.to_string())];
-        if !next_page.is_empty() {
-            query.push(("nextPageToken", next_page));
+        
+        match next_page {
+            Some(token) => query.push(("pageToken", token)),
+            None => (),
         }
+        println!("query={:?}", query);
         let album_response = client.get(uri)
-            .header("Authorization", bearer_token.as_str())
+            .header("Authorization", bearer_token)
             .query(&query)
             .send()
             .unwrap()
