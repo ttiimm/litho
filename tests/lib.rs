@@ -67,7 +67,7 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let mock = server.mock(|when, then| {
         when.method(GET)
             .path("/v1/mediaItems")
-            .query_param("pageSize", "3")
+            .query_param("pageSize", "25")
             .header("Authorization", "Bearer myaccesstoken");
         then.status(200)
             .header("Content-Type", "application/json")
@@ -79,8 +79,8 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
                      "mimeType": "image/jpeg",
                      "mediaMetadata": {
                         "creationTime": "2014-10-02T15:01:23.045123456Z"
-                     }}],
-                }));
+                    }}],
+            }));
     });
 
     let mock_endpoint = server.url("");
@@ -88,7 +88,7 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", &cwd);
     let result: litho::Album = mf.fetch_media(3).unwrap();
 
-    mock.assert_hits(2);
+    mock.assert();
     assert_eq!(None, result.next_page_token);
     assert_eq!("foo", result.media_items[0].filename);
     assert_eq!("myurl", result.media_items[0].base_url);
@@ -103,7 +103,7 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
     let mock_first = server.mock(|when, then| {
         when.method(GET)
             .path("/v1/mediaItems")
-            .query_param("pageSize", "3")
+            .query_param("pageSize", "25")
             .header("Authorization", "Bearer myaccesstoken")
             .matches(|req| {
                 !req.query_params
@@ -130,7 +130,7 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
     let mock_last = server.mock(|when, then| {
         when.method(GET)
             .path("/v1/mediaItems")
-            .query_param("pageSize", "3")
+            .query_param("pageSize", "25")
             .query_param("pageToken", "the_next_page")
             .header("Authorization", "Bearer myaccesstoken");
         then.status(200)
@@ -157,15 +157,15 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(None, result.next_page_token);
 
-    // last request
-    assert_eq!("bar", result.media_items[0].filename);
-    assert_eq!("anotherurl", result.media_items[0].base_url);
-    assert_eq!("xyz123", result.media_items[0].id);
+    // first request
+    assert_eq!("foo", result.media_items[0].filename);
+    assert_eq!("myurl", result.media_items[0].base_url);
+    assert_eq!("abc123", result.media_items[0].id);
 
-    // first reqiest
-    assert_eq!("foo", result.media_items[1].filename);
-    assert_eq!("myurl", result.media_items[1].base_url);
-    assert_eq!("abc123", result.media_items[1].id);
+    // last request
+    assert_eq!("bar", result.media_items[1].filename);
+    assert_eq!("anotherurl", result.media_items[1].base_url);
+    assert_eq!("xyz123", result.media_items[1].id);
 
     Ok(())
 }

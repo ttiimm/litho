@@ -5,16 +5,23 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use simple_server;
 
+use std::convert::TryInto;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{mpsc, Mutex};
-use std::thread;
+use std::{time, thread};
+use std::time::Duration;
 use std::vec::Vec;
 
 
 const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
     abcdefghijklmnopqrstuvwxyz\
     0123456789-.~_";
+
+const PAGE_SIZE: u32 = 25;
+
+const PAUSE_FETCH: Duration = time::Duration::from_secs(1);
+const PAUSE_WRITE: Duration = time::Duration::from_millis(250);
 
 
 type Result<T> = std::result::Result<T, Error>;
@@ -175,7 +182,7 @@ impl<'a> TokenFetcher<'a> {
              ("code", ""),
              ("code_verifier", ""),
              ("grant_type", "refresh_token"),
-             ("refresh_token", &refresh_token),], 
+             ("refresh_token", &refresh_token),],
             "access_token")
     }
 
@@ -249,22 +256,31 @@ impl<'a> MediaFetcher<'a> {
         }
     }
 
-    pub fn fetch_media(&self, page_size: u32) -> Result<Album> {
+    pub fn fetch_media(&self, number: u32) -> Result<Album> {
         let client = reqwest::blocking::Client::new();
         let uri = format!("{}/v1/mediaItems", self.base_uri);
         // println!("self.access_token={}", self.access_token);
         let bearer_token = format!("Bearer {}", self.access_token);
-        let album = self.fetch_next(&client, &uri, &bearer_token, page_size, None)?;
-        let mut next_album = self.fetch_next(&client, &uri, &bearer_token, page_size, album.next_page_token)?;
-        next_album.media_items.extend(album.media_items.into_iter());
-        return Ok(next_album);
+        let mut album = self.fetch_next(&client, &uri, &bearer_token, PAGE_SIZE, None)?;
+        let mut total = album.media_items.len();
+        let number_us: usize =  number.try_into().unwrap();
+        while album.next_page_token.is_some() && total < number_us {
+            let next_album = self.fetch_next(&client, &uri, &bearer_token, PAGE_SIZE,
+                album.next_page_token)?;
+            total += next_album.media_items.len();
+            album.media_items.extend(next_album.media_items.into_iter());
+            album.next_page_token = next_album.next_page_token;
+            thread::sleep(PAUSE_FETCH);
+        }
+
+        return Ok(album);
     }
 
     fn fetch_next(&self, client: &reqwest::blocking::Client, uri: &str,
                     bearer_token: &str, page_size: u32,
                     next_page: Option<String>) -> Result<Album> {
         let mut query = vec![("pageSize", page_size.to_string())];
-        
+
         match next_page {
             Some(token) => query.push(("pageToken", token)),
             None => (),
@@ -285,8 +301,13 @@ impl<'a> MediaFetcher<'a> {
 
     pub fn write_media(&self, album: Album) -> Result<u64> {
         let path = PathBuf::from(self.album_dir);
+        let mut i = 0;
         let written = album.media_items.iter()
-            .fold(0, |accum, media| accum + self.write_file(&mut path.clone(), media).unwrap());
+            .fold(0, |accum, media| {
+                println!("{}/{}", i, album.media_items.len());
+                i += 1;
+                return accum + self.write_file(&mut path.clone(), media).unwrap();
+            });
         Ok(written)
     }
 
@@ -298,6 +319,7 @@ impl<'a> MediaFetcher<'a> {
             Err(_) => Err(Error::IOError),
             Ok(mut response) => {
                 let file_len = response.copy_to(&mut file).unwrap();
+                thread::sleep(PAUSE_WRITE);
                 Ok(file_len)
             }
         }
