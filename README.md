@@ -25,10 +25,11 @@ the Google photo account to the current directory.
 
 If no refresh token is available, then it'll ask the user to open the browser to begin granting
 access to the user's Google photos account. This will result in gaining a refresh token, storing
-it, and proceeding to start downloading.
+it, and proceeding to start downloading the specified number of media items. The media items
+are fetched from latest to earliest taken.
 
-I'm currently working on an efficient way to synchronize the metadata about a user's photo library
-and use that information to back up the media.
+I'm currently working on an efficient way to synchronize the metadata stored on disk with what is
+stored on Google.
 
 ## Building it
 I will eventually publish some binaries of the application, but for now if you want to try it you
