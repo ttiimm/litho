@@ -269,7 +269,7 @@ impl<'a> MediaFetcher<'a> {
             Some(token) => query.push(("pageToken", token)),
             None => (),
         }
-        println!("query={:?}", query);
+        // println!("query={:?}", query);
         let album_response = client.get(uri)
             .header("Authorization", bearer_token)
             .query(&query)

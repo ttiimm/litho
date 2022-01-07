@@ -96,54 +96,6 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// #[test]
-// fn test_different_qs_responses() -> Result<(), Box<dyn std::error::Error>> {
-//     let server = MockServer::start();
-
-//     let mock_first = server.mock(|when, then| {
-//         when.method(GET)
-//             .path("/v1/mediaItems")
-//             .query_param("pageSize", "3");
-//         then.status(200)
-//             .header("Content-Type", "application/json")
-//             .json_body(json!({
-//                 "mediaItems": [],
-//                 "nextPageToken": "the_next_page"
-//                 }));
-//     });
-
-//     let mock_last = server.mock(|when, then| {
-//         when.method(GET)
-//             .path("/v1/mediaItems")
-//             .query_param("pageSize", "3")
-//             .query_param("pageToken", "the_next_page");
-//         then.status(200)
-//             .header("Content-Type", "application/json")
-//             .json_body(json!({
-//                 "mediaItems": [],
-//                 }));
-//     });
-
-//     let client = reqwest::blocking::Client::new();
-//     let mut query = vec![("pageSize", "3")];
-    
-//     // first
-//     client.get(&server.url("/v1/mediaItems"))
-//           .query(&query)
-//           .send()?;
-    
-//     query.push(("pageToken", "the_next_page"));
-
-//     // last
-//     client.get(&server.url("/v1/mediaItems"))
-//     .query(&query)
-//     .send()?;
-    
-//     mock_first.assert();
-//     mock_last.assert();
-//     Ok(())
-// }
-
 #[test]
 fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start();
@@ -152,7 +104,14 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
         when.method(GET)
             .path("/v1/mediaItems")
             .query_param("pageSize", "3")
-            .header("Authorization", "Bearer myaccesstoken");
+            .header("Authorization", "Bearer myaccesstoken")
+            .matches(|req| {
+                !req.query_params
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .any(|(k, _)| k.eq("pageToken"))
+            });
         then.status(200)
             .header("Content-Type", "application/json")
             .json_body(json!({
@@ -179,7 +138,7 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
             .json_body(json!({
                 "mediaItems": [
                     {"id": "xyz123",
-                     "baseUrl": "myurl",
+                     "baseUrl": "anotherurl",
                      "filename": "bar",
                      "mimeType": "image/jpeg",
                      "mediaMetadata": {
@@ -195,11 +154,19 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
 
     mock_first.assert();
     mock_last.assert();
+
     assert_eq!(None, result.next_page_token);
-    assert_eq!("foo", result.media_items[0].filename);
-    assert_eq!("myurl", result.media_items[0].base_url);
-    assert_eq!("abc123", result.media_items[0].id);
-    assert_eq!("bar", result.media_items[1].filename); 
+
+    // last request
+    assert_eq!("bar", result.media_items[0].filename);
+    assert_eq!("anotherurl", result.media_items[0].base_url);
+    assert_eq!("xyz123", result.media_items[0].id);
+
+    // first reqiest
+    assert_eq!("foo", result.media_items[1].filename);
+    assert_eq!("myurl", result.media_items[1].base_url);
+    assert_eq!("abc123", result.media_items[1].id);
+
     Ok(())
 }
 
