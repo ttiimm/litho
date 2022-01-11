@@ -1,4 +1,5 @@
 use base64::encode_config;
+use chrono::{NaiveDateTime, Datelike};
 use rand::Rng;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -6,7 +7,7 @@ use sha2::{Digest, Sha256};
 use simple_server;
 
 use std::convert::TryInto;
-use std::fs::File;
+use std::fs::{File, create_dir_all};
 use std::path::PathBuf;
 use std::sync::{mpsc, Mutex};
 use std::{time, thread};
@@ -312,8 +313,14 @@ impl<'a> MediaFetcher<'a> {
     }
 
     fn write_file(&self, dir: &mut PathBuf, media: &Media) -> Result<u64> {
+        let created_on = NaiveDateTime::parse_from_str(
+            media.media_metadata.creation_time.as_str(), "%Y-%m-%dT%H:%M:%S%Z").unwrap();
+        dir.push(created_on.year().to_string());
+        dir.push(format!("{:02}", created_on.month()));
+        dir.push(format!("{:02}", created_on.day()));
+        create_dir_all(dir.as_path()).unwrap();
         dir.push(&media.filename);
-        // println!("path={}", path.display());
+        // println!("path={:?}", dir.as_path());
         let mut file = File::create(dir.as_path()).unwrap();
         match reqwest::blocking::get(&media.base_url) {
             Err(_) => Err(Error::IOError),

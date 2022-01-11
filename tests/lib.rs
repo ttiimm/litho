@@ -1,11 +1,12 @@
 use httpmock::{MockServer, Regex};
 use httpmock::Method::*;
 use serde_json::json;
-use tempfile::NamedTempFile;
+use tempfile::tempdir;
 
 use std::env;
 use std::fs::File;
 use std::io::Read;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -182,9 +183,8 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
             .body(binary_content);
     });
 
-    let file = NamedTempFile::new()?;
-    let temp_path =  file.path();
-    let temp_path_buf = temp_path.parent().unwrap().to_path_buf();
+    let temp_dir = tempdir()?;
+    let temp_path_buf = PathBuf::from(temp_dir.path());
     let mock_endpoint = server.url("");
     let media_fetcher = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", &temp_path_buf);
     let mut media_items = Vec::new();
@@ -224,19 +224,20 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(8, result.unwrap());
 
     let mut path_buf_test = temp_path_buf.clone();
-    path_buf_test.push("test.jpg");
-    let mut file = File::open(path_buf_test).expect("Unable to open result file");
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).expect("Unable to read the file");
-    let buffer_contents = &buffer.as_ref();
-    assert_eq!(binary_content, buffer_contents);
+    path_buf_test.push("2014/10/02/test.jpg");
+    // println!("path={:?}", path_buf_test.as_path());
+    assert_write_media(&path_buf_test, &binary_content);
 
     let mut path_buf_camping = temp_path_buf.clone();
-    path_buf_camping.push("camping.jpg");
-    let mut file = File::open(path_buf_camping).expect("Unable to open result file");
+    path_buf_camping.push("2014/10/03/camping.jpg");
+    assert_write_media(&path_buf_camping, &binary_content);
+    Ok(())
+}
+
+fn assert_write_media(file_to_check: &PathBuf, binary_content: &[u8; 4]) {
+    let mut file = File::open(file_to_check).expect("Unable to open result file");
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).expect("Unable to read the file");
     let buffer_contents = &buffer.as_ref();
     assert_eq!(binary_content, buffer_contents);
-    Ok(())
 }

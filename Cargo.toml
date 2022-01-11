@@ -7,6 +7,7 @@ license-file = "LICENSE"
 
 [dependencies]
 base64 = "0.13.0"
+chrono = "0.4"
 keyring = "0.10.1"
 rand = "0.8.3"
 regex = "1"
