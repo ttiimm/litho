@@ -216,36 +216,40 @@ fn extract_code<T>(request: simple_server::Request<T>) -> Option<String> {
     Some(String::from(captures.get(1).unwrap().as_str()))
 }
 
-#[test]
-fn test_extract_code() {
-    let request = simple_server::Request::builder()
-        .uri("http://127.0.0.1:7878/?code=abcdefg&scope=some_scope")
-        .body(())
-        .unwrap();
-    let result = extract_code(request).unwrap();
-    assert_eq!("abcdefg", result)
-}
+#[cfg(test)] // Only compiles when running tests
+mod tests {
+    use super::extract_code;
 
-#[test]
-fn test_extract_code_at_end() {
-    let request = simple_server::Request::builder()
-        .uri("http://127.0.0.1:7878/?scope=some_scope&code=abcdefg")
-        .body(())
-        .unwrap();
-    let result = extract_code(request).unwrap();
-    assert_eq!("abcdefg", result)
-}
+    #[test]
+    fn test_extract_code() {
+        let request = simple_server::Request::builder()
+            .uri("http://127.0.0.1:7878/?code=abcdefg&scope=some_scope")
+            .body(())
+            .unwrap();
+        let result = extract_code(request).unwrap();
+        assert_eq!("abcdefg", result)
+    }
 
-#[test]
-#[should_panic]
-fn test_extract_code_missing() {
-    let request = simple_server::Request::builder()
-        .uri("http://127.0.0.1:7878/?error=barf&scope=some_scope")
-        .body(())
-        .unwrap();
-    extract_code(request);
-}
+    #[test]
+    fn test_extract_code_at_end() {
+        let request = simple_server::Request::builder()
+            .uri("http://127.0.0.1:7878/?scope=some_scope&code=abcdefg")
+            .body(())
+            .unwrap();
+        let result = extract_code(request).unwrap();
+        assert_eq!("abcdefg", result)
+    }
 
+    #[test]
+    #[should_panic]
+    fn test_extract_code_missing() {
+        let request = simple_server::Request::builder()
+            .uri("http://127.0.0.1:7878/?error=barf&scope=some_scope")
+            .body(())
+            .unwrap();
+        extract_code(request);
+    }
+}
 
 impl<'a> MediaFetcher<'a> {
 
