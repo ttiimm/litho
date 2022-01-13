@@ -49,6 +49,10 @@ pub struct TokenFetcher<'a> {
 pub struct MediaFetcher<'a> {
     base_uri: &'a str,
     access_token: &'a str,
+}
+
+
+pub struct MediaWriter<'a> {
     album_dir: &'a PathBuf,
 }
 
@@ -216,7 +220,7 @@ fn extract_code<T>(request: simple_server::Request<T>) -> Option<String> {
     Some(String::from(captures.get(1).unwrap().as_str()))
 }
 
-#[cfg(test)] // Only compiles when running tests
+#[cfg(test)]
 mod tests {
     use super::extract_code;
 
@@ -253,11 +257,10 @@ mod tests {
 
 impl<'a> MediaFetcher<'a> {
 
-    pub fn new(base_uri: &'a str, access_token: &'a str, album_dir: &'a PathBuf) -> MediaFetcher<'a> {
+    pub fn new(base_uri: &'a str, access_token: &'a str) -> MediaFetcher<'a> {
         MediaFetcher {
             base_uri,
             access_token,
-            album_dir,
         }
     }
 
@@ -302,6 +305,15 @@ impl<'a> MediaFetcher<'a> {
         let album: Album = serde_json::from_str(&album_response)?;
         // println!("album.next_page_token={}", album.next_page_token);
         Ok(album)
+    }
+}
+
+impl<'a> MediaWriter<'a> {
+
+    pub fn new(album_dir: &'a PathBuf) -> MediaWriter<'a> {
+        MediaWriter {
+            album_dir,
+        }
     }
 
     pub fn write_media(&self, album: Album, number: u32) -> Result<u64> {

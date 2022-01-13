@@ -3,7 +3,6 @@ use httpmock::Method::*;
 use serde_json::json;
 use tempfile::tempdir;
 
-use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
@@ -85,8 +84,7 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mock_endpoint = server.url("");
-    let cwd = env::current_dir()?;
-    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", &cwd);
+    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken");
     let result: litho::Album = mf.fetch_media(3).unwrap();
 
     mock.assert();
@@ -149,8 +147,7 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mock_endpoint = server.url("");
-    let cwd = env::current_dir()?;
-    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", &cwd);
+    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken");
     let result: litho::Album = mf.fetch_media(3).unwrap();
 
     mock_first.assert();
@@ -185,8 +182,7 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
 
     let temp_dir = tempdir()?;
     let temp_path_buf = PathBuf::from(temp_dir.path());
-    let mock_endpoint = server.url("");
-    let media_fetcher = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", &temp_path_buf);
+    let media_writer = litho::MediaWriter::new(&temp_path_buf);
     let mut media_items = Vec::new();
 
     let base_url_test = server.url("/v1/mediaItems/123");
@@ -218,7 +214,7 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
         media_items: media_items, 
         next_page_token: None
     };
-    let result = media_fetcher.write_media(album, 2);
+    let result = media_writer.write_media(album, 2);
 
     mock.assert_hits(2);
     assert_eq!(8, result.unwrap());

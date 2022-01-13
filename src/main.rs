@@ -37,8 +37,9 @@ fn main() -> Result<(), litho::Error> {
     photos_dir.push("photos");
     fs::create_dir_all(&photos_dir).unwrap();
     let media_fetcher = litho::MediaFetcher::new(
-        "https://photoslibrary.googleapis.com", &access_token, &photos_dir);
+        "https://photoslibrary.googleapis.com", &access_token);
     let album = media_fetcher.fetch_media(args.number)?;
-    media_fetcher.write_media(album, args.number).unwrap();
+    let media_writer = litho::MediaWriter::new(&photos_dir);
+    media_writer.write_media(album, args.number).unwrap();
     Ok(())
 }
