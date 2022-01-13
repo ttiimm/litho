@@ -8,7 +8,7 @@ use simple_server;
 
 use std::convert::TryInto;
 use std::fs::{File, create_dir_all};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Mutex};
 use std::{time, thread};
 use std::time::Duration;
@@ -81,6 +81,15 @@ pub struct Media {
 #[serde(rename_all = "camelCase")]
 pub struct MediaMetadata {
     pub creation_time: String,
+}
+
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct YearMonthDay {
+    pub year: String,
+    pub month: String,
+    pub day: String,
 }
 
 
@@ -220,38 +229,17 @@ fn extract_code<T>(request: simple_server::Request<T>) -> Option<String> {
     Some(String::from(captures.get(1).unwrap().as_str()))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::extract_code;
-
-    #[test]
-    fn test_extract_code() {
-        let request = simple_server::Request::builder()
-            .uri("http://127.0.0.1:7878/?code=abcdefg&scope=some_scope")
-            .body(())
-            .unwrap();
-        let result = extract_code(request).unwrap();
-        assert_eq!("abcdefg", result)
-    }
-
-    #[test]
-    fn test_extract_code_at_end() {
-        let request = simple_server::Request::builder()
-            .uri("http://127.0.0.1:7878/?scope=some_scope&code=abcdefg")
-            .body(())
-            .unwrap();
-        let result = extract_code(request).unwrap();
-        assert_eq!("abcdefg", result)
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_extract_code_missing() {
-        let request = simple_server::Request::builder()
-            .uri("http://127.0.0.1:7878/?error=barf&scope=some_scope")
-            .body(())
-            .unwrap();
-        extract_code(request);
+fn find_earliest(root: &Path) -> YearMonthDay {
+    // let dir = PathBuf::new();
+    // dir.push(root);
+    // let fs::read_dir(dir);
+    let year = String.from("");
+    let month = String.from("");
+    let day = String.from("");
+    YearMonthDay {
+        year,
+        month,
+        day
     }
 }
 
@@ -354,5 +342,50 @@ impl<'a> MediaWriter<'a> {
                 Ok(file_len)
             }
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::extract_code;
+    use super::find_earliest;
+
+    #[test]
+    fn test_find_earliest() {
+        let result = find_earliest(Path::new("."));
+        assert_eq!("2022", result.year);
+        assert_eq!("01", result.month);
+        assert_eq!("12", result.day);
+    }
+
+    #[test]
+    fn test_extract_code() {
+        let request = simple_server::Request::builder()
+            .uri("http://127.0.0.1:7878/?code=abcdefg&scope=some_scope")
+            .body(())
+            .unwrap();
+        let result = extract_code(request).unwrap();
+        assert_eq!("abcdefg", result)
+    }
+
+    #[test]
+    fn test_extract_code_at_end() {
+        let request = simple_server::Request::builder()
+            .uri("http://127.0.0.1:7878/?scope=some_scope&code=abcdefg")
+            .body(())
+            .unwrap();
+        let result = extract_code(request).unwrap();
+        assert_eq!("abcdefg", result)
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_extract_code_missing() {
+        let request = simple_server::Request::builder()
+            .uri("http://127.0.0.1:7878/?error=barf&scope=some_scope")
+            .body(())
+            .unwrap();
+        extract_code(request);
     }
 }
