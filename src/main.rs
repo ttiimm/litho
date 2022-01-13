@@ -39,6 +39,6 @@ fn main() -> Result<(), litho::Error> {
     let media_fetcher = litho::MediaFetcher::new(
         "https://photoslibrary.googleapis.com", &access_token, &photos_dir);
     let album = media_fetcher.fetch_media(args.number)?;
-    media_fetcher.write_media(album).unwrap();
+    media_fetcher.write_media(album, args.number).unwrap();
     Ok(())
 }

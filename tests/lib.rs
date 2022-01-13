@@ -218,7 +218,7 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
         media_items: media_items, 
         next_page_token: None
     };
-    let result = media_fetcher.write_media(album);
+    let result = media_fetcher.write_media(album, 2);
 
     mock.assert_hits(2);
     assert_eq!(8, result.unwrap());

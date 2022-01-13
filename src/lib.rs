@@ -300,14 +300,18 @@ impl<'a> MediaFetcher<'a> {
         Ok(album)
     }
 
-    pub fn write_media(&self, album: Album) -> Result<u64> {
+    pub fn write_media(&self, album: Album, number: u32) -> Result<u64> {
         let path = PathBuf::from(self.album_dir);
         let mut i = 0;
         let written = album.media_items.iter()
             .fold(0, |accum, media| {
-                println!("{}/{}", i, album.media_items.len());
+                if i == number {
+                    return accum;
+                }
+                print!("[{}/{}]\t", i + 1, number);
                 i += 1;
-                return accum + self.write_file(&mut path.clone(), media).unwrap();
+                let written = self.write_file(&mut path.clone(), media).unwrap();
+                return accum + written
             });
         Ok(written)
     }
@@ -315,10 +319,14 @@ impl<'a> MediaFetcher<'a> {
     fn write_file(&self, dir: &mut PathBuf, media: &Media) -> Result<u64> {
         let created_on = NaiveDateTime::parse_from_str(
             media.media_metadata.creation_time.as_str(), "%Y-%m-%dT%H:%M:%S%Z").unwrap();
-        dir.push(created_on.year().to_string());
-        dir.push(format!("{:02}", created_on.month()));
-        dir.push(format!("{:02}", created_on.day()));
+        let year = created_on.year().to_string();
+        dir.push(&year);
+        let month = created_on.month();
+        dir.push(format!("{:02}", month));
+        let day = created_on.day();
+        dir.push(format!("{:02}", day));
         create_dir_all(dir.as_path()).unwrap();
+        println!("{}/{}/{}", &year, month, day);
         dir.push(&media.filename);
         // println!("path={:?}", dir.as_path());
         let mut file = File::create(dir.as_path()).unwrap();
