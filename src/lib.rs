@@ -8,7 +8,7 @@ use simple_server;
 
 use std::convert::TryInto;
 use std::fs::{File, create_dir_all};
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::sync::{mpsc, Mutex};
 use std::{time, thread};
 use std::time::Duration;
@@ -229,20 +229,6 @@ fn extract_code<T>(request: simple_server::Request<T>) -> Option<String> {
     Some(String::from(captures.get(1).unwrap().as_str()))
 }
 
-fn find_earliest(root: &Path) -> YearMonthDay {
-    // let dir = PathBuf::new();
-    // dir.push(root);
-    // let fs::read_dir(dir);
-    let year = String.from("");
-    let month = String.from("");
-    let day = String.from("");
-    YearMonthDay {
-        year,
-        month,
-        day
-    }
-}
-
 impl<'a> MediaFetcher<'a> {
 
     pub fn new(base_uri: &'a str, access_token: &'a str) -> MediaFetcher<'a> {
@@ -349,15 +335,6 @@ impl<'a> MediaWriter<'a> {
 #[cfg(test)]
 mod tests {
     use super::extract_code;
-    use super::find_earliest;
-
-    #[test]
-    fn test_find_earliest() {
-        let result = find_earliest(Path::new("."));
-        assert_eq!("2022", result.year);
-        assert_eq!("01", result.month);
-        assert_eq!("12", result.day);
-    }
 
     #[test]
     fn test_extract_code() {
