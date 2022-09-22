@@ -7,8 +7,8 @@ use sha2::{Digest, Sha256};
 use simple_server;
 
 use std::convert::TryInto;
-use std::fs::{File, create_dir_all};
-use std::path::{PathBuf};
+use std::fs::{self, File, create_dir_all};
+use std::path::{PathBuf, Path};
 use std::sync::{mpsc, Mutex};
 use std::{time, thread};
 use std::time::Duration;
@@ -84,7 +84,7 @@ pub struct MediaMetadata {
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct YearMonthDay {
     pub year: String,
@@ -229,6 +229,23 @@ fn extract_code<T>(request: simple_server::Request<T>) -> Option<String> {
     Some(String::from(captures.get(1).unwrap().as_str()))
 }
 
+fn find_most_recent(mut base: PathBuf) -> Option<YearMonthDay> {
+    base.push("photos");
+    let year = read_most_recent(base.as_path());
+    base.push(year.as_str());
+    let month = read_most_recent(base.as_path());
+    base.push(month.as_str());
+    let day = read_most_recent(base.as_path());
+    Some(YearMonthDay{year, month, day})
+}
+
+fn read_most_recent(base: &Path) -> String {
+    let paths = fs::read_dir(base).unwrap();
+    let mut sorted: Vec<_> = paths.map(|r| r.unwrap()).collect();
+    sorted.sort_by_key(|dir| dir.path());
+    sorted.last().unwrap().file_name().to_string_lossy().to_string()
+}
+
 impl<'a> MediaFetcher<'a> {
 
     pub fn new(base_uri: &'a str, access_token: &'a str) -> MediaFetcher<'a> {
@@ -334,7 +351,42 @@ impl<'a> MediaWriter<'a> {
 
 #[cfg(test)]
 mod tests {
+
+    use std::fs;
+    use std::path::PathBuf;
+    use std::path::Path;
+    use tempfile::tempdir;
+
+    use crate::YearMonthDay;
+
     use super::extract_code;
+    use super::find_most_recent;
+
+    #[test]
+    fn test_most_recent() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = tempdir()?;
+        create_all_dirs(temp_dir.path(), "2023", "09", "30");
+        create_all_dirs(temp_dir.path(), "2023", "09", "29");
+        create_all_dirs(temp_dir.path(), "2023", "08", "30");
+        create_all_dirs(temp_dir.path(), "2022", "07", "28");
+        let result = find_most_recent(PathBuf::from(temp_dir.path())).unwrap();
+        let expected = YearMonthDay {
+            year: String::from("2023"),
+            month: String::from("09"),
+            day: String::from("30"),
+        };
+        assert_eq!(expected, result);
+        Ok(())
+    }
+
+    fn create_all_dirs(base: &Path, year: &str, month: &str, day: &str) {
+        let mut temp_path = PathBuf::from(base);
+        temp_path.push("photos");
+        temp_path.push(year);
+        temp_path.push(month);
+        temp_path.push(day);
+        fs::create_dir_all(&temp_path).unwrap();
+    }
 
     #[test]
     fn test_extract_code() {
