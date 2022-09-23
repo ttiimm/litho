@@ -229,21 +229,26 @@ fn extract_code<T>(request: simple_server::Request<T>) -> Option<String> {
     Some(String::from(captures.get(1).unwrap().as_str()))
 }
 
-fn find_most_recent(mut base: PathBuf) -> Option<YearMonthDay> {
+fn most_recent_date(mut base: PathBuf) -> Option<YearMonthDay> {
     base.push("photos");
-    let year = read_most_recent(base.as_path());
+    let year = last_entry(base.as_path())?;
     base.push(year.as_str());
-    let month = read_most_recent(base.as_path());
+    let month = last_entry(base.as_path())?;
     base.push(month.as_str());
-    let day = read_most_recent(base.as_path());
+    let day = last_entry(base.as_path())?;
     Some(YearMonthDay{year, month, day})
 }
 
-fn read_most_recent(base: &Path) -> String {
-    let paths = fs::read_dir(base).unwrap();
-    let mut sorted: Vec<_> = paths.map(|r| r.unwrap()).collect();
-    sorted.sort_by_key(|dir| dir.path());
-    sorted.last().unwrap().file_name().to_string_lossy().to_string()
+fn last_entry(base: &Path) -> Option<String> {
+    let paths = fs::read_dir(base);
+    match paths {
+        Ok(paths) => { 
+            let mut sorted: Vec<_> = paths.map(|r| r.unwrap()).collect();
+            sorted.sort_by_key(|dir| dir.path());
+            Some(sorted.last().unwrap().file_name().to_string_lossy().to_string())
+        },
+        Err(_) => None
+    }
 }
 
 impl<'a> MediaFetcher<'a> {
@@ -360,7 +365,7 @@ mod tests {
     use crate::YearMonthDay;
 
     use super::extract_code;
-    use super::find_most_recent;
+    use super::most_recent_date;
 
     #[test]
     fn test_most_recent() -> Result<(), Box<dyn std::error::Error>> {
@@ -369,13 +374,23 @@ mod tests {
         create_all_dirs(temp_dir.path(), "2023", "09", "29");
         create_all_dirs(temp_dir.path(), "2023", "08", "30");
         create_all_dirs(temp_dir.path(), "2022", "07", "28");
-        let result = find_most_recent(PathBuf::from(temp_dir.path())).unwrap();
+        let result = most_recent_date(PathBuf::from(temp_dir.path())).unwrap();
         let expected = YearMonthDay {
             year: String::from("2023"),
             month: String::from("09"),
             day: String::from("30"),
         };
         assert_eq!(expected, result);
+        Ok(())
+    }
+
+    #[test]
+    fn test_most_recent_empty() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = tempdir()?;
+        let mut base = PathBuf::from(temp_dir.path());
+        base.push("photos");
+        let result = most_recent_date(PathBuf::from(temp_dir.path()));
+        assert_eq!(None, result);
         Ok(())
     }
 
