@@ -65,9 +65,27 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start();
 
     let mock = server.mock(|when, then| {
-        when.method(GET)
-            .path("/v1/mediaItems")
-            .query_param("pageSize", "25")
+        when.method(POST)
+            .path("/v1/mediaItems:search")
+            .json_body(json!({
+                "orderBy": "MediaMetadata.creation_time",
+                "filters": {
+                    "dateFilter": {
+                        "ranges": [{
+                            "startDate": {
+                                "year": 2022,
+                                "month": 9,
+                                "day": 1
+                            },
+                            "endDate": {
+                                "year": 2022,
+                                "month": 9,
+                                "day": 22
+                            }}]
+                    }
+                },
+                "pageSize": 25
+                }))
             .header("Authorization", "Bearer myaccesstoken");
         then.status(200)
             .header("Content-Type", "application/json")
@@ -84,7 +102,9 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mock_endpoint = server.url("");
-    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken");
+    let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
+    let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
+    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", start, end);
     let result: litho::Album = mf.fetch_media(3).unwrap();
 
     mock.assert();
@@ -100,9 +120,27 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start();
 
     let mock_first = server.mock(|when, then| {
-        when.method(GET)
-            .path("/v1/mediaItems")
-            .query_param("pageSize", "25")
+        when.method(POST)
+            .path("/v1/mediaItems:search")
+            .json_body(json!({
+                "orderBy": "MediaMetadata.creation_time",
+                "filters": {
+                    "dateFilter": {
+                        "ranges": [{
+                            "startDate": {
+                                "year": 2022,
+                                "month": 9,
+                                "day": 1
+                            },
+                            "endDate": {
+                                "year": 2022,
+                                "month": 9,
+                                "day": 22
+                            }}]
+                    }
+                },
+                "pageSize": 25
+                }))
             .header("Authorization", "Bearer myaccesstoken")
             .matches(|req| {
                 !req.query_params
@@ -127,10 +165,28 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mock_last = server.mock(|when, then| {
-        when.method(GET)
-            .path("/v1/mediaItems")
-            .query_param("pageSize", "25")
-            .query_param("pageToken", "the_next_page")
+        when.method(POST)
+            .path("/v1/mediaItems:search")
+            .json_body(json!({
+                "orderBy": "MediaMetadata.creation_time",
+                "filters": {
+                    "dateFilter": {
+                        "ranges": [{
+                            "startDate": {
+                                "year": 2022,
+                                "month": 9,
+                                "day": 1
+                            },
+                            "endDate": {
+                                "year": 2022,
+                                "month": 9,
+                                "day": 22
+                            }}]
+                    }
+                },
+                "pageSize": 25,
+                "pageToken": "the_next_page"
+                }))
             .header("Authorization", "Bearer myaccesstoken");
         then.status(200)
             .header("Content-Type", "application/json")
@@ -147,7 +203,9 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mock_endpoint = server.url("");
-    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken");
+    let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
+    let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
+    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", start, end);
     let result: litho::Album = mf.fetch_media(3).unwrap();
 
     mock_first.assert();

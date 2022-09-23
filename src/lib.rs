@@ -3,6 +3,7 @@ use chrono::{NaiveDateTime, Datelike};
 use rand::Rng;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use simple_server;
 
@@ -49,6 +50,8 @@ pub struct TokenFetcher<'a> {
 pub struct MediaFetcher<'a> {
     base_uri: &'a str,
     access_token: &'a str,
+    start_filter: YearMonthDay,
+    end_filter: YearMonthDay
 }
 
 
@@ -87,9 +90,9 @@ pub struct MediaMetadata {
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct YearMonthDay {
-    pub year: String,
-    pub month: String,
-    pub day: String,
+    pub year: u16,
+    pub month: u8,
+    pub day: u8,
 }
 
 
@@ -229,40 +232,20 @@ fn extract_code<T>(request: simple_server::Request<T>) -> Option<String> {
     Some(String::from(captures.get(1).unwrap().as_str()))
 }
 
-fn most_recent_date(mut base: PathBuf) -> Option<YearMonthDay> {
-    base.push("photos");
-    let year = last_entry(base.as_path())?;
-    base.push(year.as_str());
-    let month = last_entry(base.as_path())?;
-    base.push(month.as_str());
-    let day = last_entry(base.as_path())?;
-    Some(YearMonthDay{year, month, day})
-}
-
-fn last_entry(base: &Path) -> Option<String> {
-    let paths = fs::read_dir(base);
-    match paths {
-        Ok(paths) => { 
-            let mut sorted: Vec<_> = paths.map(|r| r.unwrap()).collect();
-            sorted.sort_by_key(|dir| dir.path());
-            Some(sorted.last().unwrap().file_name().to_string_lossy().to_string())
-        },
-        Err(_) => None
-    }
-}
-
 impl<'a> MediaFetcher<'a> {
 
-    pub fn new(base_uri: &'a str, access_token: &'a str) -> MediaFetcher<'a> {
+    pub fn new(base_uri: &'a str, access_token: &'a str, start_filter: YearMonthDay, end_filter: YearMonthDay) -> MediaFetcher<'a> {
         MediaFetcher {
             base_uri,
             access_token,
+            start_filter,
+            end_filter
         }
     }
 
     pub fn fetch_media(&self, number: u32) -> Result<Album> {
         let client = reqwest::blocking::Client::new();
-        let uri = format!("{}/v1/mediaItems", self.base_uri);
+        let uri = format!("{}/v1/mediaItems:search", self.base_uri);
         // println!("self.access_token={}", self.access_token);
         let bearer_token = format!("Bearer {}", self.access_token);
         let mut album = self.fetch_next(&client, &uri, &bearer_token, PAGE_SIZE, None)?;
@@ -283,16 +266,25 @@ impl<'a> MediaFetcher<'a> {
     fn fetch_next(&self, client: &reqwest::blocking::Client, uri: &str,
                     bearer_token: &str, page_size: u32,
                     next_page: Option<String>) -> Result<Album> {
-        let mut query = vec![("pageSize", page_size.to_string())];
+        let mut body = json!({
+            "orderBy": "MediaMetadata.creation_time",
+            "filters": {
+                "dateFilter": {
+                    "ranges": [{"startDate": self.start_filter,
+                                "endDate": self.end_filter}]
+                }
+            },
+            "pageSize": page_size
+        });
 
         match next_page {
-            Some(token) => query.push(("pageToken", token)),
+            Some(token) => body["pageToken"] = json!(token),
             None => (),
         }
-        // println!("query={:?}", query);
-        let album_response = client.get(uri)
+        
+        let album_response = client.post(uri)
             .header("Authorization", bearer_token)
-            .query(&query)
+            .body(body.to_string())
             .send()
             .unwrap()
             .text()
@@ -303,6 +295,34 @@ impl<'a> MediaFetcher<'a> {
         Ok(album)
     }
 }
+
+
+fn most_recent_date(mut base: PathBuf) -> Option<YearMonthDay> {
+    base.push("photos");
+    let year = last_entry(base.as_path())?;
+    base.push(year.as_str());
+    let month = last_entry(base.as_path())?;
+    base.push(month.as_str());
+    let day = last_entry(base.as_path())?;
+    Some(YearMonthDay{
+        year: year.parse::<u16>().unwrap(),
+        month: month.parse::<u8>().unwrap(),
+        day: day.parse::<u8>().unwrap()
+    })
+}
+
+fn last_entry(base: &Path) -> Option<String> {
+    let paths = fs::read_dir(base);
+    match paths {
+        Ok(paths) => { 
+            let mut sorted: Vec<_> = paths.map(|r| r.unwrap()).collect();
+            sorted.sort_by_key(|dir| dir.path());
+            Some(sorted.last().unwrap().file_name().to_string_lossy().to_string())
+        },
+        Err(_) => None
+    }
+}
+
 
 impl<'a> MediaWriter<'a> {
 
@@ -376,9 +396,9 @@ mod tests {
         create_all_dirs(temp_dir.path(), "2022", "07", "28");
         let result = most_recent_date(PathBuf::from(temp_dir.path())).unwrap();
         let expected = YearMonthDay {
-            year: String::from("2023"),
-            month: String::from("09"),
-            day: String::from("30"),
+            year: 2023,
+            month: 9,
+            day: 30,
         };
         assert_eq!(expected, result);
         Ok(())
