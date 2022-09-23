@@ -90,9 +90,9 @@ pub struct MediaMetadata {
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct YearMonthDay {
-    pub year: u16,
-    pub month: u8,
-    pub day: u8,
+    pub year: i32,
+    pub month: u32,
+    pub day: u32,
 }
 
 
@@ -281,7 +281,7 @@ impl<'a> MediaFetcher<'a> {
             Some(token) => body["pageToken"] = json!(token),
             None => (),
         }
-        
+        // println!("{}", body.to_string());
         let album_response = client.post(uri)
             .header("Authorization", bearer_token)
             .body(body.to_string())
@@ -297,29 +297,36 @@ impl<'a> MediaFetcher<'a> {
 }
 
 
-fn most_recent_date(mut base: PathBuf) -> Option<YearMonthDay> {
-    base.push("photos");
+pub fn most_recent_date(mut base: PathBuf) -> Option<YearMonthDay> {
     let year = last_entry(base.as_path())?;
     base.push(year.as_str());
     let month = last_entry(base.as_path())?;
     base.push(month.as_str());
     let day = last_entry(base.as_path())?;
+    // println!("ymd: {} {} {}", year, month, day);
     Some(YearMonthDay{
-        year: year.parse::<u16>().unwrap(),
-        month: month.parse::<u8>().unwrap(),
-        day: day.parse::<u8>().unwrap()
+        year: year.parse::<i32>().unwrap(),
+        month: month.parse::<u32>().unwrap(),
+        day: day.parse::<u32>().unwrap()
     })
 }
 
+
 fn last_entry(base: &Path) -> Option<String> {
+    // println!("base: {}", base.display());
     let paths = fs::read_dir(base);
     match paths {
         Ok(paths) => { 
             let mut sorted: Vec<_> = paths.map(|r| r.unwrap()).collect();
-            sorted.sort_by_key(|dir| dir.path());
-            Some(sorted.last().unwrap().file_name().to_string_lossy().to_string())
+            sorted.sort_by_key(|entry| entry.path());
+            let result = if sorted.len() > 0 {
+                Some(sorted.last().unwrap().file_name().to_string_lossy().to_string())
+            } else {
+                None
+            };
+            result
         },
-        Err(_) => None
+        _ => None
     }
 }
 
@@ -351,6 +358,7 @@ impl<'a> MediaWriter<'a> {
     fn write_file(&self, dir: &mut PathBuf, media: &Media) -> Result<u64> {
         let created_on = NaiveDateTime::parse_from_str(
             media.media_metadata.creation_time.as_str(), "%Y-%m-%dT%H:%M:%S%Z").unwrap();
+        // println!("created_on {}", created_on);
         let year = created_on.year().to_string();
         dir.push(&year);
         let month = created_on.month();
@@ -359,8 +367,12 @@ impl<'a> MediaWriter<'a> {
         dir.push(format!("{:02}", day));
         create_dir_all(dir.as_path()).unwrap();
         println!("{}/{}/{}", &year, month, day);
+        // println!("{}/{}/{} {}", &year, month, day, media.id);
         dir.push(&media.filename);
         // println!("path={:?}", dir.as_path());
+        if dir.exists() {
+            return Ok(0);
+        } 
         let mut file = File::create(dir.as_path()).unwrap();
         match reqwest::blocking::get(&media.base_url) {
             Err(_) => Err(Error::IOError),
@@ -394,7 +406,9 @@ mod tests {
         create_all_dirs(temp_dir.path(), "2023", "09", "29");
         create_all_dirs(temp_dir.path(), "2023", "08", "30");
         create_all_dirs(temp_dir.path(), "2022", "07", "28");
-        let result = most_recent_date(PathBuf::from(temp_dir.path())).unwrap();
+        let mut base = PathBuf::from(temp_dir.path());
+        base.push("photos");
+        let result = most_recent_date(base).unwrap();
         let expected = YearMonthDay {
             year: 2023,
             month: 9,
@@ -409,7 +423,8 @@ mod tests {
         let temp_dir = tempdir()?;
         let mut base = PathBuf::from(temp_dir.path());
         base.push("photos");
-        let result = most_recent_date(PathBuf::from(temp_dir.path()));
+        fs::create_dir_all(&base).unwrap();
+        let result = most_recent_date(base);
         assert_eq!(None, result);
         Ok(())
     }

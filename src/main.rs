@@ -1,11 +1,14 @@
+use chrono::{Datelike, Local};
+use litho::YearMonthDay;
+use structopt::StructOpt;
+
 use std::env;
 use std::fs;
-use structopt::StructOpt;
 
 
 #[derive(StructOpt)]
 struct Cli {
-    number: u32
+    number: Option<u32>
 }
 
 fn main() -> Result<(), litho::Error> {
@@ -36,12 +39,17 @@ fn main() -> Result<(), litho::Error> {
     let mut photos_dir = env::current_dir().unwrap();
     photos_dir.push("photos");
     fs::create_dir_all(&photos_dir).unwrap();
-    let start_filter = litho::YearMonthDay { year: 2021, month: 9, day: 1 };
-    let end_filter = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
+
+    let most_recent_path = photos_dir.clone();
+    let start_filter = litho::most_recent_date(most_recent_path)
+        .unwrap_or(YearMonthDay{year: 1970, month: 1, day: 1});
+    let today = Local::today();
+    let end_filter = litho::YearMonthDay { year: today.year(), month: today.month(), day: today.day() };
     let media_fetcher = litho::MediaFetcher::new(
         "https://photoslibrary.googleapis.com", &access_token, start_filter, end_filter);
-    let album = media_fetcher.fetch_media(args.number)?;
+    let number = args.number.unwrap_or(u32::MAX);
+    let album = media_fetcher.fetch_media(number)?;
     let media_writer = litho::MediaWriter::new(&photos_dir);
-    media_writer.write_media(album, args.number).unwrap();
+    media_writer.write_media(album, number).unwrap();
     Ok(())
 }
