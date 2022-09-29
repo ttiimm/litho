@@ -5,7 +5,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use simple_server;
+use tiny_http::{Server, Response};
 
 use std::convert::TryInto;
 use std::fs::{self, File, create_dir_all};
@@ -151,23 +151,26 @@ impl<'a> TokenFetcher<'a> {
     }
 
     fn start(&self, tx: mpsc::Sender<String>) {
+        let server = tiny_http::Server::http(format!("{}:{}", TokenFetcher::HOST, TokenFetcher::PORT))
+            .unwrap();
+
         let m = Mutex::new(Some(tx.clone()));
-        let mut server = simple_server::Server::new(move |request, mut response| {
-            println!("Request received. {} {}", request.method(), request.uri());
-            let code = extract_code(request);
-            match code {
-                Some(x) => {
-                    if let Some(tx) = m.lock().unwrap().take() {
-                        tx.send(x).unwrap();
-                    }
-                    Ok(response.body(format!("Authorization complete.").as_bytes().to_vec())?)
-                }
-                None => Ok(response.body("Ok".as_bytes().to_vec())?),
-            }
-        });
-        server.dont_serve_static_files();
         thread::spawn(move || {
-            server.listen(TokenFetcher::HOST, TokenFetcher::PORT);
+            for request in server.recv() {
+                println!("Request received. {} {}", request.method(), request.url());
+                let code = extract_code(request.url());
+                let result: Result<&str> = match code {
+                    Some(x) => {
+                        if let Some(tx) = m.lock().unwrap().take() {
+                            tx.send(x).unwrap();
+                        }
+                        Ok("Authorization complete.")
+                    }
+                    None => Ok("Authorization failed."),
+                };
+                let response = tiny_http::Response::from_string(result.unwrap());
+                let _ = request.respond(response);
+            }
         });
     }
 
@@ -181,7 +184,7 @@ impl<'a> TokenFetcher<'a> {
             self.auth_uri.as_str()
         );
         let code = rx.recv().unwrap();
-        println!("Code was: {}", code);
+        // println!("Code was: {}", code);
         self.stop();
         self.refresh([("client_id", self.client_id),
                  ("client_secret", self.client_secret),
@@ -224,11 +227,9 @@ impl<'a> TokenFetcher<'a> {
 }
 
 
-fn extract_code<T>(request: simple_server::Request<T>) -> Option<String> {
-    let path_query = request.uri().path_and_query()?;
-    let query = path_query.query()?;
+fn extract_code(url: &str) -> Option<String> {
     let re = Regex::new(r"code=(.*?)(&|$)").unwrap();
-    let captures = re.captures(query).unwrap();
+    let captures = re.captures(url).unwrap();
     Some(String::from(captures.get(1).unwrap().as_str()))
 }
 
@@ -440,31 +441,21 @@ mod tests {
 
     #[test]
     fn test_extract_code() {
-        let request = simple_server::Request::builder()
-            .uri("http://127.0.0.1:7878/?code=abcdefg&scope=some_scope")
-            .body(())
+        let result = extract_code("http://127.0.0.1:7878/?code=abcdefg&scope=some_scope")
             .unwrap();
-        let result = extract_code(request).unwrap();
         assert_eq!("abcdefg", result)
     }
 
     #[test]
     fn test_extract_code_at_end() {
-        let request = simple_server::Request::builder()
-            .uri("http://127.0.0.1:7878/?scope=some_scope&code=abcdefg")
-            .body(())
+        let result = extract_code("http://127.0.0.1:7878/?scope=some_scope&code=abcdefg")
             .unwrap();
-        let result = extract_code(request).unwrap();
         assert_eq!("abcdefg", result)
     }
 
     #[test]
     #[should_panic]
     fn test_extract_code_missing() {
-        let request = simple_server::Request::builder()
-            .uri("http://127.0.0.1:7878/?error=barf&scope=some_scope")
-            .body(())
-            .unwrap();
-        extract_code(request);
+        extract_code("http://127.0.0.1:7878/?error=barf&scope=some_scope");
     }
 }
