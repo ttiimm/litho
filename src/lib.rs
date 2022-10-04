@@ -5,7 +5,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use tiny_http::{Server, Response};
+use tiny_http;
 
 use std::convert::TryInto;
 use std::fs::{self, File, create_dir_all};
@@ -244,7 +244,7 @@ impl<'a> MediaFetcher<'a> {
         }
     }
 
-    pub fn fetch_media(&self, number: u32) -> Result<Album> {
+    pub fn fetch_media(&self, number: u32) -> Result<Vec<Media>> {
         let client = reqwest::blocking::Client::new();
         let uri = format!("{}/v1/mediaItems:search", self.base_uri);
         // println!("self.access_token={}", self.access_token);
@@ -261,7 +261,7 @@ impl<'a> MediaFetcher<'a> {
             thread::sleep(PAUSE_FETCH);
         }
 
-        return Ok(album);
+        return Ok(album.media_items);
     }
 
     fn fetch_next(&self, client: &reqwest::blocking::Client, uri: &str,
@@ -340,10 +340,10 @@ impl<'a> MediaWriter<'a> {
         }
     }
 
-    pub fn write_media(&self, album: Album, number: u32) -> Result<u64> {
+    pub fn write_media(&self, media: Vec<Media>, number: u32) -> Result<u64> {
         let path = PathBuf::from(self.album_dir);
         let mut i = 0;
-        let written = album.media_items.iter()
+        let written = media.iter()
             .fold(0, |accum, media| {
                 if i == number {
                     return accum;

@@ -105,13 +105,12 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
     let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
     let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", start, end);
-    let result: litho::Album = mf.fetch_media(3).unwrap();
+    let result = mf.fetch_media(3).unwrap();
 
     mock.assert();
-    assert_eq!(None, result.next_page_token);
-    assert_eq!("foo", result.media_items[0].filename);
-    assert_eq!("myurl", result.media_items[0].base_url);
-    assert_eq!("abc123", result.media_items[0].id);
+    assert_eq!("foo", result[0].filename);
+    assert_eq!("myurl", result[0].base_url);
+    assert_eq!("abc123", result[0].id);
     Ok(())
 }
 
@@ -206,22 +205,20 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
     let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
     let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
     let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", start, end);
-    let result: litho::Album = mf.fetch_media(3).unwrap();
+    let result = mf.fetch_media(3).unwrap();
 
     mock_first.assert();
     mock_last.assert();
 
-    assert_eq!(None, result.next_page_token);
-
     // first request
-    assert_eq!("foo", result.media_items[0].filename);
-    assert_eq!("myurl", result.media_items[0].base_url);
-    assert_eq!("abc123", result.media_items[0].id);
+    assert_eq!("foo", result[0].filename);
+    assert_eq!("myurl", result[0].base_url);
+    assert_eq!("abc123", result[0].id);
 
     // last request
-    assert_eq!("bar", result.media_items[1].filename);
-    assert_eq!("anotherurl", result.media_items[1].base_url);
-    assert_eq!("xyz123", result.media_items[1].id);
+    assert_eq!("bar", result[1].filename);
+    assert_eq!("anotherurl", result[1].base_url);
+    assert_eq!("xyz123", result[1].id);
 
     Ok(())
 }
@@ -241,8 +238,8 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = tempdir()?;
     let temp_path_buf = PathBuf::from(temp_dir.path());
     let media_writer = litho::MediaWriter::new(&temp_path_buf);
-    let album = init_album(&server);
-    let result = media_writer.write_media(album, 2);
+    let media = init_media(&server);
+    let result = media_writer.write_media(media, 2);
 
     mock.assert_hits(2);
     assert_eq!(8, result.unwrap());
@@ -273,8 +270,8 @@ fn test_write_media_when_album_has_more() -> Result<(), Box<dyn std::error::Erro
     let temp_dir = tempdir()?;
     let temp_path_buf = PathBuf::from(temp_dir.path());
     let media_writer = litho::MediaWriter::new(&temp_path_buf);
-    let album = init_album(&server);
-    let result = media_writer.write_media(album, 1);
+    let media = init_media(&server);
+    let result = media_writer.write_media(media, 1);
 
     mock.assert();
     assert_eq!(4, result.unwrap());
@@ -298,7 +295,7 @@ fn assert_write_media(file_to_check: &PathBuf, binary_content: &[u8; 4]) {
     assert_eq!(binary_content, buffer_contents);
 }
 
-fn init_album(server: &MockServer) -> litho::Album {
+fn init_media(server: &MockServer) -> Vec<litho::Media> {
     let mut media_items = Vec::new();
 
     let base_url_test = server.url("/v1/mediaItems/123");
@@ -326,8 +323,5 @@ fn init_album(server: &MockServer) -> litho::Album {
     };
     media_items.push(test_pic);
     media_items.push(camping_pic);
-    litho::Album{
-        media_items: media_items, 
-        next_page_token: None
-    }
+    media_items
 }

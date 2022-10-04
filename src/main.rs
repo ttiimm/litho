@@ -48,8 +48,8 @@ fn main() -> Result<(), litho::Error> {
     let media_fetcher = litho::MediaFetcher::new(
         "https://photoslibrary.googleapis.com", &access_token, start_filter, end_filter);
     let number = args.number.unwrap_or(u32::MAX);
-    let album = media_fetcher.fetch_media(number)?;
+    let media = media_fetcher.fetch_media(number)?;
     let media_writer = litho::MediaWriter::new(&photos_dir);
-    media_writer.write_media(album, number).unwrap();
+    media_writer.write_media(media, number).unwrap();
     Ok(())
 }
