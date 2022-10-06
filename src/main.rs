@@ -4,6 +4,8 @@ use structopt::StructOpt;
 
 use std::env;
 use std::fs;
+use std::sync::mpsc;
+use std::thread;
 
 
 #[derive(StructOpt)]
@@ -46,10 +48,18 @@ fn main() -> Result<(), litho::Error> {
     let today = Local::today();
     let end_filter = YearMonthDay { year: today.year(), month: today.month(), day: today.day() };
     let media_fetcher = litho::MediaFetcher::new(
-        "https://photoslibrary.googleapis.com", &access_token, start_filter, end_filter);
+        String::from("https://photoslibrary.googleapis.com"), access_token, start_filter,
+        end_filter);
     let number = args.number.unwrap_or(u32::MAX);
-    let media = media_fetcher.fetch_media(number)?;
+
+    let (tx, rx) = mpsc::channel();
+    let helper = thread::spawn(move || {
+        media_fetcher.fetch_media(number, tx);
+    });
+
     let media_writer = litho::MediaWriter::new(&photos_dir);
-    media_writer.write_media(media, number).unwrap();
+    media_writer.write_channel(rx, number).unwrap();
+
+    helper.join().unwrap();
     Ok(())
 }

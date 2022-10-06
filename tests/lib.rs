@@ -104,8 +104,8 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     let mock_endpoint = server.url("");
     let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
     let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
-    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", start, end);
-    let result = mf.fetch_media(3).unwrap();
+    let mf = litho::MediaFetcher::new(mock_endpoint, String::from("myaccesstoken"), start, end);
+    let result = mf.fetch_sync(3).unwrap();
 
     mock.assert();
     assert_eq!("foo", result[0].filename);
@@ -204,8 +204,8 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
     let mock_endpoint = server.url("");
     let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
     let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
-    let mf = litho::MediaFetcher::new(&mock_endpoint, "myaccesstoken", start, end);
-    let result = mf.fetch_media(3).unwrap();
+    let mf = litho::MediaFetcher::new(mock_endpoint, String::from("myaccesstoken"), start, end);
+    let result = mf.fetch_sync(3).unwrap();
 
     mock_first.assert();
     mock_last.assert();

@@ -10,7 +10,8 @@ use tiny_http;
 use std::convert::TryInto;
 use std::fs::{self, File, create_dir_all};
 use std::path::{PathBuf, Path};
-use std::sync::{mpsc, Mutex};
+use std::sync::Mutex;
+use std::sync::mpsc::{self, Sender, Receiver, SendError};
 use std::thread;
 use std::time::Duration;
 use std::vec::Vec;
@@ -33,7 +34,8 @@ type Result<T> = std::result::Result<T, Error>;
 pub enum Error{
     SerError,
     FetchError,
-    IOError
+    IOError,
+    SendError
 }
 
 
@@ -47,9 +49,9 @@ pub struct TokenFetcher<'a> {
 }
 
 
-pub struct MediaFetcher<'a> {
-    base_uri: &'a str,
-    access_token: &'a str,
+pub struct MediaFetcher {
+    base_uri: String,
+    access_token: String,
     start_filter: YearMonthDay,
     end_filter: YearMonthDay
 }
@@ -105,6 +107,15 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+// XXX: this copy pasta could probably be written differently
+impl From<SendError<Vec<Media>>> for Error {
+    fn from(err: SendError<Vec<Media>>) -> Error {
+        // XXX: need to map the errors so that the underlying failure message
+        // can be used
+        print!("Err {}", err);
+        Error::SendError
+    }
+}
 
 impl<'a> TokenFetcher<'a> {
     const HOST: &'static str = "localhost";
@@ -150,7 +161,7 @@ impl<'a> TokenFetcher<'a> {
         url
     }
 
-    fn start(&self, tx: mpsc::Sender<String>) {
+    fn start(&self, tx: Sender<String>) {
         let server = tiny_http::Server::http(format!("{}:{}", TokenFetcher::HOST, TokenFetcher::PORT))
             .unwrap();
 
@@ -233,9 +244,9 @@ fn extract_code(url: &str) -> Option<String> {
     Some(String::from(captures.get(1).unwrap().as_str()))
 }
 
-impl<'a> MediaFetcher<'a> {
+impl MediaFetcher {
 
-    pub fn new(base_uri: &'a str, access_token: &'a str, start_filter: YearMonthDay, end_filter: YearMonthDay) -> MediaFetcher<'a> {
+    pub fn new(base_uri: String, access_token: String, start_filter: YearMonthDay, end_filter: YearMonthDay) -> MediaFetcher {
         MediaFetcher {
             base_uri,
             access_token,
@@ -244,29 +255,37 @@ impl<'a> MediaFetcher<'a> {
         }
     }
 
-    pub fn fetch_media(&self, number: u32) -> Result<Vec<Media>> {
+    pub fn fetch_sync(&self, number: u32) -> Result<Vec<Media>> {
+        let (tx, rx) = mpsc::channel();
+        self.fetch_media(number, tx);
+        let mut media: Vec<Media> = Vec::new();
+        for received in rx {
+            media.extend(received);
+        }
+        Ok(media)
+    }
+
+    pub fn fetch_media(&self, number: u32, tx: Sender<Vec<Media>>) {
         let client = reqwest::blocking::Client::new();
         let uri = format!("{}/v1/mediaItems:search", self.base_uri);
         // println!("self.access_token={}", self.access_token);
         let bearer_token = format!("Bearer {}", self.access_token);
-        let mut album = self.fetch_next(&client, &uri, &bearer_token, PAGE_SIZE, None)?;
-        let mut total = album.media_items.len();
+        let mut total = 0;
         let number_us: usize =  number.try_into().unwrap();
-        while album.next_page_token.is_some() && total < number_us {
+        let mut next_page_token = Some(String::from(""));
+        while next_page_token.is_some() && total < number_us {
             let next_album = self.fetch_next(&client, &uri, &bearer_token, PAGE_SIZE,
-                album.next_page_token)?;
+                                             next_page_token).unwrap();
             total += next_album.media_items.len();
-            album.media_items.extend(next_album.media_items.into_iter());
-            album.next_page_token = next_album.next_page_token;
+            next_page_token = next_album.next_page_token;
+            tx.send(next_album.media_items).unwrap();
             thread::sleep(PAUSE_FETCH);
         }
-
-        return Ok(album.media_items);
     }
 
     fn fetch_next(&self, client: &reqwest::blocking::Client, uri: &str,
-                    bearer_token: &str, page_size: u32,
-                    next_page: Option<String>) -> Result<Album> {
+                  bearer_token: &str, page_size: u32,
+                  next_page: Option<String>) -> Result<Album> {
         let mut body = json!({
             "orderBy": "MediaMetadata.creation_time",
             "filters": {
@@ -279,8 +298,9 @@ impl<'a> MediaFetcher<'a> {
         });
 
         match next_page {
-            Some(token) => body["pageToken"] = json!(token),
             None => (),
+            Some(token) if token == "" => (),
+            Some(token) => body["pageToken"] = json!(token),
         }
         // println!("{}", body.to_string());
         let album_response = client.post(uri)
@@ -292,7 +312,7 @@ impl<'a> MediaFetcher<'a> {
             .unwrap();
         // println!("album={}", album_response);
         let album: Album = serde_json::from_str(&album_response)?;
-        // println!("album.next_page_token={}", album.next_page_token);
+        // println!("album.next_page_token={}", next_page_token);
         Ok(album)
     }
 }
@@ -341,18 +361,29 @@ impl<'a> MediaWriter<'a> {
     }
 
     pub fn write_media(&self, media: Vec<Media>, number: u32) -> Result<u64> {
+        let (tx, rx) = mpsc::channel();
+        tx.send(media)?;
+        self.write_channel(rx, number)
+    }
+
+    pub fn write_channel(&self, rx: Receiver<Vec<Media>>, number: u32) -> Result<u64> {
         let path = PathBuf::from(self.album_dir);
         let mut i = 0;
-        let written = media.iter()
-            .fold(0, |accum, media| {
+        let mut written = 0;
+        let iter = rx.iter();
+        for next in iter {
+            let batch_result = next.iter().fold(0, |accum, media| {
                 if i == number {
                     return accum;
                 }
                 print!("[{}/{}]\t", i + 1, number);
                 i += 1;
-                let written = self.write_file(&mut path.clone(), media).unwrap();
-                return accum + written
+                let result = self.write_file(&mut path.clone(), media).unwrap();
+                return accum + result
             });
+            written += batch_result;
+        }
+        // println!("written {}", written);
         Ok(written)
     }
 
@@ -370,7 +401,7 @@ impl<'a> MediaWriter<'a> {
         println!("{}/{}/{}", &year, month, day);
         // println!("{}/{}/{} {}", &year, month, day, media.id);
         dir.push(&media.filename);
-        // println!("path={:?}", dir.as_path());
+        println!("path={:?}", dir.as_path());
         if dir.exists() {
             return Ok(0);
         } 
