@@ -11,7 +11,7 @@ use std::convert::TryInto;
 use std::fs::{self, File, create_dir_all};
 use std::path::{PathBuf, Path};
 use std::sync::{mpsc, Mutex};
-use std::{time, thread};
+use std::thread;
 use std::time::Duration;
 use std::vec::Vec;
 
@@ -22,8 +22,8 @@ const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
 
 const PAGE_SIZE: u32 = 25;
 
-const PAUSE_FETCH: Duration = time::Duration::from_secs(1);
-const PAUSE_WRITE: Duration = time::Duration::from_millis(250);
+const PAUSE_FETCH: Duration = Duration::from_secs(1);
+const PAUSE_WRITE: Duration = Duration::from_millis(250);
 
 
 type Result<T> = std::result::Result<T, Error>;
@@ -125,9 +125,9 @@ impl<'a> TokenFetcher<'a> {
             client_id,
             client_secret,
             code_verifier: String::from_utf8(code_verifier).unwrap(),
-            auth_uri: auth_uri,
-            redirect_uri: redirect_uri,
-            refresh_uri: refresh_uri,
+            auth_uri,
+            redirect_uri,
+            refresh_uri,
         }
     }
 

@@ -44,7 +44,7 @@ fn main() -> Result<(), litho::Error> {
     let start_filter = litho::most_recent_date(most_recent_path)
         .unwrap_or(YearMonthDay{year: 1970, month: 1, day: 1});
     let today = Local::today();
-    let end_filter = litho::YearMonthDay { year: today.year(), month: today.month(), day: today.day() };
+    let end_filter = YearMonthDay { year: today.year(), month: today.month(), day: today.day() };
     let media_fetcher = litho::MediaFetcher::new(
         "https://photoslibrary.googleapis.com", &access_token, start_filter, end_filter);
     let number = args.number.unwrap_or(u32::MAX);
