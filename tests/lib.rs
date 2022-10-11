@@ -238,7 +238,7 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = tempdir()?;
     let temp_path_buf = PathBuf::from(temp_dir.path());
     let media_writer = litho::MediaWriter::new(&temp_path_buf);
-    let media = init_media(&server);
+    let media = init_media(&server, None);
     let result = media_writer.write_media(media, 2);
 
     mock.assert_hits(2);
@@ -246,6 +246,38 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut path_buf_test = temp_path_buf.clone();
     path_buf_test.push("2014/10/02/test.jpg");
+    // println!("path={:?}", path_buf_test.as_path());
+    assert_write_media(&path_buf_test, &binary_content);
+
+    let mut path_buf_camping = temp_path_buf.clone();
+    path_buf_camping.push("2014/10/03/camping.jpg");
+    assert_write_media(&path_buf_camping, &binary_content);
+    Ok(())
+}
+
+#[test]
+fn test_write_media_bad_filename() -> Result<(), Box<dyn std::error::Error>> {
+    let server = MockServer::start();
+    let binary_content = b"\xca\xfe\xba\xbe";
+
+    let mock = server.mock(|when, then| {
+        when.method(GET)
+            .path_matches(Regex::new(r#"/v1/mediaItems/.*"#).unwrap());
+        then.status(200)
+            .body(binary_content);
+    });
+
+    let temp_dir = tempdir()?;
+    let temp_path_buf = PathBuf::from(temp_dir.path());
+    let media_writer = litho::MediaWriter::new(&temp_path_buf);
+    let media = init_media(&server, Some("0/1.jpg"));
+    let result = media_writer.write_media(media, 2);
+
+    mock.assert_hits(2);
+    assert_eq!(8, result.unwrap());
+
+    let mut path_buf_test = temp_path_buf.clone();
+    path_buf_test.push("2014/10/02/0%2f1.jpg");
     // println!("path={:?}", path_buf_test.as_path());
     assert_write_media(&path_buf_test, &binary_content);
 
@@ -270,7 +302,7 @@ fn test_write_media_when_album_has_more() -> Result<(), Box<dyn std::error::Erro
     let temp_dir = tempdir()?;
     let temp_path_buf = PathBuf::from(temp_dir.path());
     let media_writer = litho::MediaWriter::new(&temp_path_buf);
-    let media = init_media(&server);
+    let media = init_media(&server, None);
     let result = media_writer.write_media(media, 1);
 
     mock.assert();
@@ -295,19 +327,20 @@ fn assert_write_media(file_to_check: &PathBuf, binary_content: &[u8; 4]) {
     assert_eq!(binary_content, buffer_contents);
 }
 
-fn init_media(server: &MockServer) -> Vec<litho::Media> {
+fn init_media(server: &MockServer, filename: Option<&str>) -> Vec<litho::Media> {
     let mut media_items = Vec::new();
 
     let base_url_test = server.url("/v1/mediaItems/123");
     let metadata_test = litho::MediaMetadata{
         creation_time:  String::from("2014-10-02T15:01:23.045123456Z")
     };
+    let name = filename.unwrap_or("test.jpg");
     let test_pic = litho::Media{
         id:  String::from("abc123"),
         media_metadata: metadata_test,
         mime_type: String::from("image/jpeg"),
         base_url: base_url_test.clone(),
-        filename: String::from("test.jpg"),
+        filename: String::from(name),
     };
 
     let base_url_camping = server.url("/v1/mediaItems/456");

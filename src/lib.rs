@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use tiny_http;
+use urlencoding::encode;
 
 use std::convert::TryInto;
 use std::fs::{self, File, create_dir_all};
@@ -362,7 +363,10 @@ impl<'a> MediaWriter<'a> {
 
     pub fn write_media(&self, media: Vec<Media>, number: u32) -> Result<u64> {
         let (tx, rx) = mpsc::channel();
-        tx.send(media)?;
+        let t = thread::spawn(move || {
+            tx.send(media).unwrap();
+        });
+        t.join().unwrap();
         self.write_channel(rx, number)
     }
 
@@ -387,25 +391,25 @@ impl<'a> MediaWriter<'a> {
         Ok(written)
     }
 
-    fn write_file(&self, dir: &mut PathBuf, media: &Media) -> Result<u64> {
+    fn write_file(&self, pathbuf: &mut PathBuf, media: &Media) -> Result<u64> {
         let created_on = NaiveDateTime::parse_from_str(
             media.media_metadata.creation_time.as_str(), "%Y-%m-%dT%H:%M:%S%Z").unwrap();
         // println!("created_on {}", created_on);
         let year = created_on.year().to_string();
-        dir.push(&year);
+        pathbuf.push(&year);
         let month = created_on.month();
-        dir.push(format!("{:02}", month));
+        pathbuf.push(format!("{:02}", month));
         let day = created_on.day();
-        dir.push(format!("{:02}", day));
-        create_dir_all(dir.as_path()).unwrap();
+        pathbuf.push(format!("{:02}", day));
+        create_dir_all(pathbuf.as_path()).unwrap();
         println!("{}/{}/{}", &year, month, day);
         // println!("{}/{}/{} {}", &year, month, day, media.id);
-        dir.push(&media.filename);
-        println!("path={:?}", dir.as_path());
-        if dir.exists() {
+        pathbuf.push(encode(&media.filename).to_string());
+        // println!("path={:?}", pathbuf.as_path());
+        if pathbuf.exists() {
             return Ok(0);
         } 
-        let mut file = File::create(dir.as_path()).unwrap();
+        let mut file = File::create(pathbuf.as_path()).unwrap();
         match reqwest::blocking::get(&media.base_url) {
             Err(_) => Err(Error::IOError),
             Ok(mut response) => {
