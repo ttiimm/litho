@@ -9,7 +9,9 @@ use std::thread;
 
 
 #[derive(StructOpt)]
+/// A utility for fetching photos from Google.
 struct Cli {
+    /// an optional limit of the number of photos to fetch
     number: Option<u32>
 }
 
