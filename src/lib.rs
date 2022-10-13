@@ -16,11 +16,13 @@ use std::sync::mpsc::{self, Sender, Receiver, SendError};
 use std::thread;
 use std::time::Duration;
 use std::vec::Vec;
+use reqwest::StatusCode;
 
 
 const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
     abcdefghijklmnopqrstuvwxyz\
     0123456789-.~_";
+
 
 const PAGE_SIZE: u32 = 25;
 
@@ -66,13 +68,14 @@ pub struct MediaWriter<'a> {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Album {
+    #[serde(default = "Vec::new")]
     pub media_items: Vec<Media>,
     #[serde(default)]
     pub next_page_token: Option<String>
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Media {
     pub id: String,
@@ -83,7 +86,7 @@ pub struct Media {
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaMetadata {
     pub creation_time: String,
@@ -304,17 +307,24 @@ impl MediaFetcher {
             Some(token) => body["pageToken"] = json!(token),
         }
         // println!("{}", body.to_string());
-        let album_response = client.post(uri)
+        let response = client.post(uri)
             .header("Authorization", bearer_token)
             .body(body.to_string())
             .send()
-            .unwrap()
-            .text()
             .unwrap();
-        // println!("album={}", album_response);
-        let album: Album = serde_json::from_str(&album_response)?;
-        // println!("album.next_page_token={}", next_page_token);
-        Ok(album)
+
+        // println!("album={}", response);
+        match response.status() {
+            StatusCode::OK => {
+                let album_raw = response.text().unwrap();
+                let album: Album = serde_json::from_str(&album_raw)?;
+                // println!("album.next_page_token={}", next_page_token);
+                Ok(album)
+            }
+            _ => {
+                panic!("Problem fetching metadata: {:?}", response);
+            }
+        }
     }
 }
 
@@ -374,13 +384,15 @@ impl<'a> MediaWriter<'a> {
         let path = PathBuf::from(self.album_dir);
         let mut i = 0;
         let mut written = 0;
+        let to_display = if number == u32::MAX { String::from("∞") }
+            else { number.to_string() };
         let iter = rx.iter();
         for next in iter {
             let batch_result = next.iter().fold(0, |accum, media| {
                 if i == number {
                     return accum;
                 }
-                print!("[{}/{}]\t", i + 1, number);
+                print!("[{}/{}]\t", i + 1, to_display);
                 i += 1;
                 let result = self.write_file(&mut path.clone(), media).unwrap();
                 return accum + result
