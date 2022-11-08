@@ -1,4 +1,5 @@
 # Litho
+
 As a parent of young children, I use Google photos extensibly to back up and make 
 all my photos easily accessible on all devices as well as to share with family and friends.
 I've never been a fan of sharing on social media, so I appreciate having an easy to use
@@ -43,6 +44,9 @@ then it will be stored at the path
 `$CWD/photos/2018/03/03/photo.jpg`
 
 ## Building it
+
+[![Rust-CI/CD](https://github.com/ttiimm/litho/actions/workflows/rust.yml/badge.svg)](https://github.com/ttiimm/litho/actions/workflows/rust.yml)
+
 I will eventually publish some binaries of the application, but for now if you want to try it you
 have to build it yourself.
 
