@@ -8,6 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CLIENT_ID: ${{ secrets.CLIENT_ID }}
+  CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
 
 jobs:
   build:
@@ -17,9 +19,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build
-      env:
-        CLIENT_ID: ${{ secrets.CLIENT_ID }}
-        CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
