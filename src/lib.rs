@@ -417,7 +417,7 @@ impl<'a> MediaWriter<'a> {
         println!("{}/{}/{}", &year, month, day);
         // println!("{}/{}/{} {}", &year, month, day, media.id);
         pathbuf.push(encode(&media.filename).to_string());
-        println!("path={:?}", pathbuf.as_path());
+        // println!("path={:?}", pathbuf.as_path());
         if pathbuf.exists() {
             return Ok(0);
         } 

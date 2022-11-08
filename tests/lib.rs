@@ -364,8 +364,8 @@ fn test_write_media_bad_filename() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(8, result.unwrap());
 
     let mut path_buf_test = temp_path_buf.clone();
-    path_buf_test.push("2014/10/02/0%2f1.jpg");
-    println!("path={:?}", path_buf_test.as_path());
+    path_buf_test.push("2014/10/02/0%2F1.jpg");
+    // println!("path={:?}", path_buf_test.as_path());
     assert_write_media(&path_buf_test, &binary_content);
 
     let mut path_buf_camping = temp_path_buf.clone();
