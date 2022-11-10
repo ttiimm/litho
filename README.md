@@ -45,7 +45,7 @@ then it will be stored at the path
 
 ## Building it
 
-[![Rust-CI/CD](https://github.com/ttiimm/litho/actions/workflows/rust.yml/badge.svg)](https://github.com/ttiimm/litho/actions/workflows/rust.yml)
+[![Rust-CI/CD](https://github.com/ttiimm/litho/actions/workflows/build.yml/badge.svg)](https://github.com/ttiimm/litho/actions/workflows/build.yml)
 
 I will eventually publish some binaries of the application, but for now if you want to try it you
 have to build it yourself.
