@@ -5,6 +5,10 @@ on:
     tags:
       - v[0-9]+.*
 
+env:
+  CLIENT_ID: ${{ secrets.CLIENT_ID }}
+  CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+
 jobs:
   create-release:
     runs-on: ubuntu-latest
