@@ -30,6 +30,7 @@ jobs:
           - macos-latest
           #- windows-latest
     runs-on: ${{ matrix.os }}
+    environment: build
     steps:
       - uses: actions/checkout@v2
       - uses: taiki-e/upload-rust-binary-action@v1
