@@ -1,4 +1,4 @@
-name: Rust-CI/CD
+name: Build
 
 on:
   push:
