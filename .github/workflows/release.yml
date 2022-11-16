@@ -44,7 +44,7 @@ jobs:
           # (optional) On which platform to distribute the `.zip` file.
           # [default value: windows]
           # [possible values: all, unix, windows, none]
-          zip: windows, macos
+          zip: all
           include: LICENSE,README.md
           leading_dir: true
         env:
