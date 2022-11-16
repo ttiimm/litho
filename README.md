@@ -7,9 +7,10 @@ service that lets me maintain privacy.
 
 In the last couple years, Google has made it increasingly difficult to easily synchronize 
 photo back ups from their service onto local storage. Their Backup and Sync application 
-will readily upload files from a computer or phone, but no longer supports automatically 
-downloading them to a local drive. This is my attempt to fill that gap and make it easy for 
-people to back up their photos from Google onto local storage.
+will readily upload files from a computer or phone, [but no longer supports automatically 
+downloading](https://support.google.com/photos/answer/9316089) them to a local drive. This 
+is my attempt to fill that gap and make it easy for people to back up their photos from Google
+onto local storage.
 
 An alternative is to use Google's take out, but feels pretty heavy handed and is asynchronous
 causing one to wait for the zip to be ready. I'd prefer to fetch all missing photos to local 
@@ -29,11 +30,11 @@ When the program is run, it checks for a refresh token (stored via [keyring-rs](
 If found, then it uses that to fetch an access token. 
 
 If no refresh token is available, then it'll ask the user to open the browser to begin granting
-access to the user's Google photos account. This will result in gaining a refresh token, storing
-it, and proceeding to start downloading the specified number of media items. The media items
-are fetched from latest to earliest taken.
+access to the user's Google photos account. This will result in gaining an refresh and access token, storing
+the refresh token, and proceeding to start downloading the specified number of media items. The media items
+are fetched from latest to most recent.
 
-With the access token, the program will start fetching the metadata of the current library 
+When the download commences, the application will start fetching the metadata of the user's library 
 starting from the oldest photo forward.
 
 Simultanesouly it will start downloading the media to the current working directory under a 
@@ -43,33 +44,53 @@ then it will be stored at the path
 
 `$CWD/photos/2018/03/03/photo.jpg`
 
-## Building it
+The application runs until the specified limit (or all) media are downloaded. If the application exits
+before all media are downloaded, then when run again it will resume from the most recent item. Any items
+with duplicate names are considered to be the same and not re-downloaded. If photos were added prior to
+the last item downloaded, then those will not be fetched.
 
-[![Rust-CI/CD](https://github.com/ttiimm/litho/actions/workflows/build.yml/badge.svg)](https://github.com/ttiimm/litho/actions/workflows/build.yml)
-
-I will eventually publish some binaries of the application, but for now if you want to try it you
-have to build it yourself.
-
-```
-$ cargo build
-```
-
-When the application is run, it expects the `CLIENT_ID` and `CLIENT_SECRET` to be set as environment
-variables, otherwise it'll panick. When I publish a binary, I'll bake the ones I use into the binary
-but until then, you'll need to obtain some from Google and set them yourself.
-
+## Usage
 
 ```
 litho 0.1.0
-A utility for fetching photos from Google
+A utility for fetching photos from Google.
+
+Photos will be downloaded into the current directory into the path:
+
+$CWD/photos/yyyy/mm/dd/file-name.jpg
+
+where the directory structure is based off the date the photo was taken (or uploaded on) and the original file name. The
+Google Photo API may not return the media at the original resolution and will not include all orginal metadata like the
+geolocation. Use Google Take Out to fetch the original if a true back up is desired.
 
 USAGE:
-    litho [number]
+    litho [OPTIONS]
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
 
-ARGS:
-    <number>    an optional limit of the number of photos to fetch
+OPTIONS:
+    -l, --limit <limit>    an optional limit of the number of photos to fetch
+```
+
+## Building it
+
+[![Rust-CI/CD](https://github.com/ttiimm/litho/actions/workflows/build.yml/badge.svg)](https://github.com/ttiimm/litho/actions/workflows/build.yml)
+
+```
+$ CLIENT_ID=XXX CLIENT_SECRET=YYY cargo build
+```
+
+When the application is run, it expects the `CLIENT_ID` and `CLIENT_SECRET` to be set as environment
+variables, otherwise it'll panic. The published binaries, have some baked in, but if you plan to build
+independently then you'll need to grab some from [Google](https://developers.google.com/learn/pathways/gcp/get-started-projects).
+
+For regular development, I use a `build.rs` file this in order to avoid having to set each time. 
+
+```
+fn main() {
+    println!("cargo:rustc-env=CLIENT_ID=XXX);
+    println!("cargo:rustc-env=CLIENT_SECRET=YYY);
+}
 ```
