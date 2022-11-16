@@ -259,9 +259,9 @@ impl MediaFetcher {
         }
     }
 
-    pub fn fetch_sync(&self, number: u32) -> Result<Vec<Media>> {
+    pub fn fetch_sync(&self, limit: u32) -> Result<Vec<Media>> {
         let (tx, rx) = mpsc::channel();
-        self.fetch_media(number, tx);
+        self.fetch_media(limit, tx);
         let mut media: Vec<Media> = Vec::new();
         for received in rx {
             media.extend(received);
@@ -269,17 +269,17 @@ impl MediaFetcher {
         Ok(media)
     }
 
-    pub fn fetch_media(&self, number: u32, tx: Sender<Vec<Media>>) {
+    pub fn fetch_media(&self, limit: u32, tx: Sender<Vec<Media>>) {
         let client = reqwest::blocking::Client::new();
         let uri = format!("{}/v1/mediaItems:search", self.base_uri);
         // println!("self.access_token={}", self.access_token);
         let bearer_token = format!("Bearer {}", self.access_token);
         let mut total = 0;
-        let number_us: usize =  number.try_into().unwrap();
+        let limit_us: usize =  limit.try_into().unwrap();
         let mut next_page_token = Some(String::from(""));
-        while next_page_token.is_some() && total < number_us {
+        while next_page_token.is_some() && total < limit_us {
             let next_album = self.fetch_next(&client, &uri, &bearer_token, PAGE_SIZE,
-                                             next_page_token).unwrap();
+                                                    next_page_token).unwrap();
             total += next_album.media_items.len();
             next_page_token = next_album.next_page_token;
             tx.send(next_album.media_items).unwrap();
@@ -371,25 +371,25 @@ impl<'a> MediaWriter<'a> {
         }
     }
 
-    pub fn write_media(&self, media: Vec<Media>, number: u32) -> Result<u64> {
+    pub fn write_media(&self, media: Vec<Media>, limit: u32) -> Result<u64> {
         let (tx, rx) = mpsc::channel();
         let t = thread::spawn(move || {
             tx.send(media).unwrap();
         });
         t.join().unwrap();
-        self.write_channel(rx, number)
+        self.write_channel(rx, limit)
     }
 
-    pub fn write_channel(&self, rx: Receiver<Vec<Media>>, number: u32) -> Result<u64> {
+    pub fn write_channel(&self, rx: Receiver<Vec<Media>>, limit: u32) -> Result<u64> {
         let path = PathBuf::from(self.album_dir);
         let mut i = 0;
         let mut written = 0;
-        let to_display = if number == u32::MAX { String::from("∞") }
-            else { number.to_string() };
+        let to_display = if limit == u32::MAX { String::from("∞") }
+            else { limit.to_string() };
         let iter = rx.iter();
         for next in iter {
             let batch_result = next.iter().fold(0, |accum, media| {
-                if i == number {
+                if i == limit {
                     return accum;
                 }
                 print!("[{}/{}]\t", i + 1, to_display);

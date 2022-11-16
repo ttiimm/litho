@@ -10,9 +10,21 @@ use std::thread;
 
 #[derive(StructOpt)]
 /// A utility for fetching photos from Google.
+/// 
+/// Photos will be downloaded into the current directory into the
+/// path: 
+/// 
+/// $CWD/photos/yyyy/mm/dd/file-name.jpg
+/// 
+/// where the directory structure is based off the date the photo was taken (or
+/// uploaded on) and the original file name. The Google Photo API may not return 
+/// the media at the original resolution and will not include all orginal metadata 
+/// like the geolocation. Use Google Take Out to fetch the original if a true back 
+/// up is desired.
 struct Cli {
     /// an optional limit of the number of photos to fetch
-    number: Option<u32>
+    #[structopt(short, long)]
+    limit: Option<u32>
 }
 
 fn main() -> Result<(), litho::Error> {
@@ -52,15 +64,15 @@ fn main() -> Result<(), litho::Error> {
     let media_fetcher = litho::MediaFetcher::new(
         String::from("https://photoslibrary.googleapis.com"), access_token, start_filter,
         end_filter);
-    let number = args.number.unwrap_or(u32::MAX);
+    let limit = args.limit.unwrap_or(u32::MAX);
 
     let (tx, rx) = mpsc::channel();
     let helper = thread::spawn(move || {
-        media_fetcher.fetch_media(number, tx);
+        media_fetcher.fetch_media(limit, tx);
     });
 
     let media_writer = litho::MediaWriter::new(&photos_dir);
-    media_writer.write_channel(rx, number).unwrap();
+    media_writer.write_channel(rx, limit).unwrap();
 
     helper.join().unwrap();
     Ok(())
