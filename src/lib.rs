@@ -422,7 +422,8 @@ impl<'a> MediaWriter<'a> {
             return Ok(0);
         } 
         let mut file = File::create(pathbuf.as_path()).unwrap();
-        match reqwest::blocking::get(&media.base_url) {
+        let download_url = format!("{}=d", media.base_url);
+        match reqwest::blocking::get(&download_url) {
             Err(_) => Err(Error::IOError),
             Ok(mut response) => {
                 let file_len = response.copy_to(&mut file).unwrap();
