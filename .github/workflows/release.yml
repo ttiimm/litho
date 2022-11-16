@@ -40,11 +40,12 @@ jobs:
           # (optional) On which platform to distribute the `.tar.gz` file.
           # [default value: unix]
           # [possible values: all, unix, windows, none]
-          tar: unix
+          tar: all
           # (optional) On which platform to distribute the `.zip` file.
           # [default value: windows]
           # [possible values: all, unix, windows, none]
           zip: all
+          archive: $bin-$tag-$target
           include: LICENSE,README.md
           leading_dir: true
         env:
