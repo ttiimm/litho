@@ -94,3 +94,10 @@ fn main() {
     println!("cargo:rustc-env=CLIENT_SECRET=YYY);
 }
 ```
+
+## Similar Projects
+
+* [Google Takeout](https://takeout.google.com/) - officially supported Google back up service
+* [gphotos-sync](https://github.com/gilesknap/gphotos-sync) - Python based project to sync with Google Photos
+* [rclone](https://github.com/rclone/rclone) - rsync for the cloud
+* [icloud_photo_station](https://github.com/skarppi/icloud_photo_station) - icloud based photo back up utility
