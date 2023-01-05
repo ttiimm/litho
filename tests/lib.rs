@@ -1,5 +1,5 @@
-use httpmock::{MockServer, Regex};
 use httpmock::Method::*;
+use httpmock::{MockServer, Regex};
 use serde_json::json;
 use tempfile::tempdir;
 
@@ -16,10 +16,10 @@ fn test_fetch_refresh() {
     let mock_endpoint = server.url("/token");
     let (tx, rx) = mpsc::channel();
 
-    thread::spawn(move || { 
+    thread::spawn(move || {
         let tf = litho::TokenFetcher::new("myclientid", "myclientsecret", &mock_endpoint);
         let refresh_token = tf.fetch_refresh().unwrap();
-        tx.send(refresh_token).unwrap(); 
+        tx.send(refresh_token).unwrap();
     });
 
     let mock = server.mock(|when, then| {
@@ -32,7 +32,9 @@ fn test_fetch_refresh() {
     });
     let redirect_uri = format!("http://localhost:7878?code=mycode");
     reqwest::blocking::Client::new()
-        .get(redirect_uri).send().unwrap();
+        .get(redirect_uri)
+        .send()
+        .unwrap();
     let result = rx.recv_timeout(Duration::from_secs(3)).unwrap();
 
     mock.assert();
@@ -68,24 +70,24 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
         when.method(POST)
             .path("/v1/mediaItems:search")
             .json_body(json!({
-                "orderBy": "MediaMetadata.creation_time",
-                "filters": {
-                    "dateFilter": {
-                        "ranges": [{
-                            "startDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 1
-                            },
-                            "endDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 22
-                            }}]
-                    }
-                },
-                "pageSize": 25
-                }))
+            "orderBy": "MediaMetadata.creation_time",
+            "filters": {
+                "dateFilter": {
+                    "ranges": [{
+                        "startDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 1
+                        },
+                        "endDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 22
+                        }}]
+                }
+            },
+            "pageSize": 25
+            }))
             .header("Authorization", "Bearer myaccesstoken");
         then.status(200)
             .header("Content-Type", "application/json")
@@ -102,8 +104,16 @@ fn test_fetch_media() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mock_endpoint = server.url("");
-    let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
-    let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
+    let start = litho::YearMonthDay {
+        year: 2022,
+        month: 9,
+        day: 1,
+    };
+    let end = litho::YearMonthDay {
+        year: 2022,
+        month: 9,
+        day: 22,
+    };
     let mf = litho::MediaFetcher::new(mock_endpoint, String::from("myaccesstoken"), start, end);
     let result = mf.fetch_sync(3).unwrap();
 
@@ -122,24 +132,24 @@ fn test_fetch_media_no_mediaitems() -> Result<(), Box<dyn std::error::Error>> {
         when.method(POST)
             .path("/v1/mediaItems:search")
             .json_body(json!({
-                "orderBy": "MediaMetadata.creation_time",
-                "filters": {
-                    "dateFilter": {
-                        "ranges": [{
-                            "startDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 1
-                            },
-                            "endDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 22
-                            }}]
-                    }
-                },
-                "pageSize": 25
-                }))
+            "orderBy": "MediaMetadata.creation_time",
+            "filters": {
+                "dateFilter": {
+                    "ranges": [{
+                        "startDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 1
+                        },
+                        "endDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 22
+                        }}]
+                }
+            },
+            "pageSize": 25
+            }))
             .header("Authorization", "Bearer myaccesstoken");
         then.status(200)
             .header("Content-Type", "application/json")
@@ -147,8 +157,16 @@ fn test_fetch_media_no_mediaitems() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mock_endpoint = server.url("");
-    let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
-    let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
+    let start = litho::YearMonthDay {
+        year: 2022,
+        month: 9,
+        day: 1,
+    };
+    let end = litho::YearMonthDay {
+        year: 2022,
+        month: 9,
+        day: 22,
+    };
     let mf = litho::MediaFetcher::new(mock_endpoint, String::from("myaccesstoken"), start, end);
     let result = mf.fetch_sync(3).unwrap();
 
@@ -166,24 +184,24 @@ fn test_fetch_media_bad_response() {
         when.method(POST)
             .path("/v1/mediaItems:search")
             .json_body(json!({
-                "orderBy": "MediaMetadata.creation_time",
-                "filters": {
-                    "dateFilter": {
-                        "ranges": [{
-                            "startDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 1
-                            },
-                            "endDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 22
-                            }}]
-                    }
-                },
-                "pageSize": 25
-                }))
+            "orderBy": "MediaMetadata.creation_time",
+            "filters": {
+                "dateFilter": {
+                    "ranges": [{
+                        "startDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 1
+                        },
+                        "endDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 22
+                        }}]
+                }
+            },
+            "pageSize": 25
+            }))
             .header("Authorization", "Bearer myaccesstoken");
         then.status(404)
             .header("Content-Type", "application/json")
@@ -194,8 +212,16 @@ fn test_fetch_media_bad_response() {
     });
 
     let mock_endpoint = server.url("");
-    let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
-    let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
+    let start = litho::YearMonthDay {
+        year: 2022,
+        month: 9,
+        day: 1,
+    };
+    let end = litho::YearMonthDay {
+        year: 2022,
+        month: 9,
+        day: 22,
+    };
     let mf = litho::MediaFetcher::new(mock_endpoint, String::from("myaccesstoken"), start, end);
     mf.fetch_sync(3).unwrap();
     mock.assert();
@@ -209,24 +235,24 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
         when.method(POST)
             .path("/v1/mediaItems:search")
             .json_body(json!({
-                "orderBy": "MediaMetadata.creation_time",
-                "filters": {
-                    "dateFilter": {
-                        "ranges": [{
-                            "startDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 1
-                            },
-                            "endDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 22
-                            }}]
-                    }
-                },
-                "pageSize": 25
-                }))
+            "orderBy": "MediaMetadata.creation_time",
+            "filters": {
+                "dateFilter": {
+                    "ranges": [{
+                        "startDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 1
+                        },
+                        "endDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 22
+                        }}]
+                }
+            },
+            "pageSize": 25
+            }))
             .header("Authorization", "Bearer myaccesstoken")
             .matches(|req| {
                 !req.query_params
@@ -238,59 +264,67 @@ fn test_fetch_media_pagination() -> Result<(), Box<dyn std::error::Error>> {
         then.status(200)
             .header("Content-Type", "application/json")
             .json_body(json!({
-                "mediaItems": [
-                    {"id": "abc123",
-                     "baseUrl": "myurl",
-                     "filename": "foo",
-                     "mimeType": "image/jpeg",
-                     "mediaMetadata": {
-                        "creationTime": "2014-10-02T15:01:23.045123456Z"
-                     }}],
-                "nextPageToken": "the_next_page"
-                }));
+            "mediaItems": [
+                {"id": "abc123",
+                 "baseUrl": "myurl",
+                 "filename": "foo",
+                 "mimeType": "image/jpeg",
+                 "mediaMetadata": {
+                    "creationTime": "2014-10-02T15:01:23.045123456Z"
+                 }}],
+            "nextPageToken": "the_next_page"
+            }));
     });
 
     let mock_last = server.mock(|when, then| {
         when.method(POST)
             .path("/v1/mediaItems:search")
             .json_body(json!({
-                "orderBy": "MediaMetadata.creation_time",
-                "filters": {
-                    "dateFilter": {
-                        "ranges": [{
-                            "startDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 1
-                            },
-                            "endDate": {
-                                "year": 2022,
-                                "month": 9,
-                                "day": 22
-                            }}]
-                    }
-                },
-                "pageSize": 25,
-                "pageToken": "the_next_page"
-                }))
+            "orderBy": "MediaMetadata.creation_time",
+            "filters": {
+                "dateFilter": {
+                    "ranges": [{
+                        "startDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 1
+                        },
+                        "endDate": {
+                            "year": 2022,
+                            "month": 9,
+                            "day": 22
+                        }}]
+                }
+            },
+            "pageSize": 25,
+            "pageToken": "the_next_page"
+            }))
             .header("Authorization", "Bearer myaccesstoken");
         then.status(200)
             .header("Content-Type", "application/json")
             .json_body(json!({
-                "mediaItems": [
-                    {"id": "xyz123",
-                     "baseUrl": "anotherurl",
-                     "filename": "bar",
-                     "mimeType": "image/jpeg",
-                     "mediaMetadata": {
-                        "creationTime": "2013-10-02T15:01:23.045123456Z"
-                     }}],
-                }));
+            "mediaItems": [
+                {"id": "xyz123",
+                 "baseUrl": "anotherurl",
+                 "filename": "bar",
+                 "mimeType": "image/jpeg",
+                 "mediaMetadata": {
+                    "creationTime": "2013-10-02T15:01:23.045123456Z"
+                 }}],
+            }));
     });
 
     let mock_endpoint = server.url("");
-    let start = litho::YearMonthDay { year: 2022, month: 9, day: 1 };
-    let end = litho::YearMonthDay { year: 2022, month: 9, day: 22 };
+    let start = litho::YearMonthDay {
+        year: 2022,
+        month: 9,
+        day: 1,
+    };
+    let end = litho::YearMonthDay {
+        year: 2022,
+        month: 9,
+        day: 22,
+    };
     let mf = litho::MediaFetcher::new(mock_endpoint, String::from("myaccesstoken"), start, end);
     let result = mf.fetch_sync(3).unwrap();
 
@@ -318,8 +352,7 @@ fn test_write_media() -> Result<(), Box<dyn std::error::Error>> {
     let mock = server.mock(|when, then| {
         when.method(GET)
             .path_matches(Regex::new(r#"/v1/mediaItems/.*"#).unwrap());
-        then.status(200)
-            .body(binary_content);
+        then.status(200).body(binary_content);
     });
 
     let temp_dir = tempdir()?;
@@ -350,8 +383,7 @@ fn test_write_media_bad_filename() -> Result<(), Box<dyn std::error::Error>> {
     let mock = server.mock(|when, then| {
         when.method(GET)
             .path_matches(Regex::new(r#"/v1/mediaItems/.*"#).unwrap());
-        then.status(200)
-            .body(binary_content);
+        then.status(200).body(binary_content);
     });
 
     let temp_dir = tempdir()?;
@@ -382,8 +414,7 @@ fn test_write_media_when_album_has_more() -> Result<(), Box<dyn std::error::Erro
     let mock = server.mock(|when, then| {
         when.method(GET)
             .path_matches(Regex::new(r#"/v1/mediaItems/.*"#).unwrap());
-        then.status(200)
-            .body(binary_content);
+        then.status(200).body(binary_content);
     });
 
     let temp_dir = tempdir()?;
@@ -409,7 +440,8 @@ fn test_write_media_when_album_has_more() -> Result<(), Box<dyn std::error::Erro
 fn assert_write_media(file_to_check: &PathBuf, binary_content: &[u8; 4]) {
     let mut file = File::open(file_to_check).expect("Unable to open result file");
     let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).expect("Unable to read the file");
+    file.read_to_end(&mut buffer)
+        .expect("Unable to read the file");
     let buffer_contents = &buffer.as_ref();
     assert_eq!(binary_content, buffer_contents);
 }
@@ -418,12 +450,12 @@ fn init_media(server: &MockServer, filename: Option<&str>) -> Vec<litho::Media> 
     let mut media_items = Vec::new();
 
     let base_url_test = server.url("/v1/mediaItems/123");
-    let metadata_test = litho::MediaMetadata{
-        creation_time:  String::from("2014-10-02T15:01:23.045123456Z")
+    let metadata_test = litho::MediaMetadata {
+        creation_time: String::from("2014-10-02T15:01:23.045123456Z"),
     };
     let name = filename.unwrap_or("test.jpg");
-    let test_pic = litho::Media{
-        id:  String::from("abc123"),
+    let test_pic = litho::Media {
+        id: String::from("abc123"),
         media_metadata: metadata_test,
         mime_type: String::from("image/jpeg"),
         base_url: base_url_test.clone(),
@@ -431,11 +463,11 @@ fn init_media(server: &MockServer, filename: Option<&str>) -> Vec<litho::Media> 
     };
 
     let base_url_camping = server.url("/v1/mediaItems/456");
-    let metadata_camping = litho::MediaMetadata{
-        creation_time:  String::from("2014-10-03T15:01:23.045123456Z")
+    let metadata_camping = litho::MediaMetadata {
+        creation_time: String::from("2014-10-03T15:01:23.045123456Z"),
     };
-    let camping_pic = litho::Media{
-        id:  String::from("abc123"),
+    let camping_pic = litho::Media {
+        id: String::from("abc123"),
         media_metadata: metadata_camping,
         mime_type: String::from("image/jpeg"),
         base_url: base_url_camping.clone(),

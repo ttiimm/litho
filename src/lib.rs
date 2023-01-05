@@ -1,5 +1,5 @@
 use base64::encode_config;
-use chrono::{NaiveDateTime, Datelike};
+use chrono::{Datelike, NaiveDateTime};
 use rand::Rng;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -8,39 +8,34 @@ use sha2::{Digest, Sha256};
 use tiny_http;
 use urlencoding::encode;
 
+use reqwest::StatusCode;
 use std::convert::TryInto;
-use std::fs::{self, File, create_dir_all};
-use std::path::{PathBuf, Path};
+use std::fs::{self, create_dir_all, File};
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, Receiver, SendError, Sender};
 use std::sync::Mutex;
-use std::sync::mpsc::{self, Sender, Receiver, SendError};
 use std::thread;
 use std::time::Duration;
 use std::vec::Vec;
-use reqwest::StatusCode;
-
 
 const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
     abcdefghijklmnopqrstuvwxyz\
     0123456789-.~_";
-
 
 const PAGE_SIZE: u32 = 25;
 
 const PAUSE_FETCH: Duration = Duration::from_secs(1);
 const PAUSE_WRITE: Duration = Duration::from_millis(250);
 
-
 type Result<T> = std::result::Result<T, Error>;
 
-
 #[derive(Debug, Clone)]
-pub enum Error{
+pub enum Error {
     SerError,
     FetchError,
     IOError,
-    SendError
+    SendError,
 }
-
 
 pub struct TokenFetcher<'a> {
     client_id: &'a str,
@@ -51,19 +46,16 @@ pub struct TokenFetcher<'a> {
     refresh_uri: &'a str,
 }
 
-
 pub struct MediaFetcher {
     base_uri: String,
     access_token: String,
     start_filter: YearMonthDay,
-    end_filter: YearMonthDay
+    end_filter: YearMonthDay,
 }
-
 
 pub struct MediaWriter<'a> {
     album_dir: &'a PathBuf,
 }
-
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,9 +63,8 @@ pub struct Album {
     #[serde(default = "Vec::new")]
     pub media_items: Vec<Media>,
     #[serde(default)]
-    pub next_page_token: Option<String>
+    pub next_page_token: Option<String>,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -85,13 +76,11 @@ pub struct Media {
     pub filename: String,
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaMetadata {
     pub creation_time: String,
 }
-
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -100,7 +89,6 @@ pub struct YearMonthDay {
     pub month: u32,
     pub day: u32,
 }
-
 
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Error {
@@ -125,7 +113,11 @@ impl<'a> TokenFetcher<'a> {
     const HOST: &'static str = "localhost";
     const PORT: &'static str = "7878";
 
-    pub fn new(client_id: &'a str, client_secret: &'a str, refresh_uri: &'a str) -> TokenFetcher<'a> {
+    pub fn new(
+        client_id: &'a str,
+        client_secret: &'a str,
+        refresh_uri: &'a str,
+    ) -> TokenFetcher<'a> {
         let mut rng = rand::thread_rng();
         let code_verifier: Vec<u8> = (0..128)
             .map(|_| {
@@ -159,15 +151,19 @@ impl<'a> TokenFetcher<'a> {
             .append_pair("client_id", client_id)
             .append_pair("redirect_uri", redirect_uri)
             .append_pair("response_type", "code")
-            .append_pair("scope", "https://www.googleapis.com/auth/photoslibrary.readonly",)
+            .append_pair(
+                "scope",
+                "https://www.googleapis.com/auth/photoslibrary.readonly",
+            )
             .append_pair("code_challenge", code_challenge)
             .append_pair("code_challenge_method", "S256");
         url
     }
 
     fn start(&self, tx: Sender<String>) {
-        let server = tiny_http::Server::http(format!("{}:{}", TokenFetcher::HOST, TokenFetcher::PORT))
-            .unwrap();
+        let server =
+            tiny_http::Server::http(format!("{}:{}", TokenFetcher::HOST, TokenFetcher::PORT))
+                .unwrap();
 
         let m = Mutex::new(Some(tx.clone()));
         thread::spawn(move || {
@@ -201,46 +197,52 @@ impl<'a> TokenFetcher<'a> {
         let code = rx.recv().unwrap();
         // println!("Code was: {}", code);
         self.stop();
-        self.refresh([("client_id", self.client_id),
-                 ("client_secret", self.client_secret),
-                 ("code", &code),
-                 ("code_verifier", &self.code_verifier),
-                 ("grant_type", "authorization_code"),
-                 ("redirect_uri", &self.redirect_uri),],
-                "refresh_token")
+        self.refresh(
+            [
+                ("client_id", self.client_id),
+                ("client_secret", self.client_secret),
+                ("code", &code),
+                ("code_verifier", &self.code_verifier),
+                ("grant_type", "authorization_code"),
+                ("redirect_uri", &self.redirect_uri),
+            ],
+            "refresh_token",
+        )
     }
 
     pub fn fetch_access(&self, refresh_token: &str) -> Result<String> {
         self.refresh(
-            [("client_id", &self.client_id),
-             ("client_secret", &self.client_secret),
-             ("code", ""),
-             ("code_verifier", ""),
-             ("grant_type", "refresh_token"),
-             ("refresh_token", &refresh_token),],
-            "access_token")
+            [
+                ("client_id", &self.client_id),
+                ("client_secret", &self.client_secret),
+                ("code", ""),
+                ("code_verifier", ""),
+                ("grant_type", "refresh_token"),
+                ("refresh_token", &refresh_token),
+            ],
+            "access_token",
+        )
     }
 
     fn refresh(&self, params: [(&str, &str); 6], field: &str) -> Result<String> {
         // println!("params={:?}", params);
         let client = reqwest::blocking::Client::new();
-        let request = client.post(self.refresh_uri)
-            .form(&params);
+        let request = client.post(self.refresh_uri).form(&params);
         let result = request.send();
         match result {
             Ok(r) => {
-                let refresh_value: serde_json::Value = serde_json::from_str(&r.text().unwrap()).unwrap();
+                let refresh_value: serde_json::Value =
+                    serde_json::from_str(&r.text().unwrap()).unwrap();
                 // println!("field={}", field);
                 // println!("text={}", refresh_value);
                 let value = refresh_value[field].as_str().unwrap();
                 // println!("refresh_value={}", value);
                 Ok(String::from(value))
-            },
+            }
             Err(_) => Err(Error::FetchError),
         }
     }
 }
-
 
 fn extract_code(url: &str) -> Option<String> {
     let re = Regex::new(r"code=(.*?)(&|$)").unwrap();
@@ -249,13 +251,17 @@ fn extract_code(url: &str) -> Option<String> {
 }
 
 impl MediaFetcher {
-
-    pub fn new(base_uri: String, access_token: String, start_filter: YearMonthDay, end_filter: YearMonthDay) -> MediaFetcher {
+    pub fn new(
+        base_uri: String,
+        access_token: String,
+        start_filter: YearMonthDay,
+        end_filter: YearMonthDay,
+    ) -> MediaFetcher {
         MediaFetcher {
             base_uri,
             access_token,
             start_filter,
-            end_filter
+            end_filter,
         }
     }
 
@@ -275,11 +281,12 @@ impl MediaFetcher {
         // println!("self.access_token={}", self.access_token);
         let bearer_token = format!("Bearer {}", self.access_token);
         let mut total = 0;
-        let limit_us: usize =  limit.try_into().unwrap();
+        let limit_us: usize = limit.try_into().unwrap();
         let mut next_page_token = Some(String::from(""));
         while next_page_token.is_some() && total < limit_us {
-            let next_album = self.fetch_next(&client, &uri, &bearer_token, PAGE_SIZE,
-                                                    next_page_token).unwrap();
+            let next_album = self
+                .fetch_next(&client, &uri, &bearer_token, PAGE_SIZE, next_page_token)
+                .unwrap();
             total += next_album.media_items.len();
             next_page_token = next_album.next_page_token;
             tx.send(next_album.media_items).unwrap();
@@ -287,9 +294,14 @@ impl MediaFetcher {
         }
     }
 
-    fn fetch_next(&self, client: &reqwest::blocking::Client, uri: &str,
-                  bearer_token: &str, page_size: u32,
-                  next_page: Option<String>) -> Result<Album> {
+    fn fetch_next(
+        &self,
+        client: &reqwest::blocking::Client,
+        uri: &str,
+        bearer_token: &str,
+        page_size: u32,
+        next_page: Option<String>,
+    ) -> Result<Album> {
         let mut body = json!({
             "orderBy": "MediaMetadata.creation_time",
             "filters": {
@@ -307,7 +319,8 @@ impl MediaFetcher {
             Some(token) => body["pageToken"] = json!(token),
         }
         // println!("{}", body.to_string());
-        let response = client.post(uri)
+        let response = client
+            .post(uri)
             .header("Authorization", bearer_token)
             .body(body.to_string())
             .send()
@@ -328,7 +341,6 @@ impl MediaFetcher {
     }
 }
 
-
 pub fn most_recent_date(mut base: PathBuf) -> Option<YearMonthDay> {
     let year = last_entry(base.as_path())?;
     base.push(year.as_str());
@@ -336,39 +348,41 @@ pub fn most_recent_date(mut base: PathBuf) -> Option<YearMonthDay> {
     base.push(month.as_str());
     let day = last_entry(base.as_path())?;
     // println!("ymd: {} {} {}", year, month, day);
-    Some(YearMonthDay{
+    Some(YearMonthDay {
         year: year.parse::<i32>().unwrap(),
         month: month.parse::<u32>().unwrap(),
-        day: day.parse::<u32>().unwrap()
+        day: day.parse::<u32>().unwrap(),
     })
 }
-
 
 fn last_entry(base: &Path) -> Option<String> {
     // println!("base: {}", base.display());
     let paths = fs::read_dir(base);
     match paths {
-        Ok(paths) => { 
+        Ok(paths) => {
             let mut sorted: Vec<_> = paths.map(|r| r.unwrap()).collect();
             sorted.sort_by_key(|entry| entry.path());
             let result = if sorted.len() > 0 {
-                Some(sorted.last().unwrap().file_name().to_string_lossy().to_string())
+                Some(
+                    sorted
+                        .last()
+                        .unwrap()
+                        .file_name()
+                        .to_string_lossy()
+                        .to_string(),
+                )
             } else {
                 None
             };
             result
-        },
-        _ => None
+        }
+        _ => None,
     }
 }
 
-
 impl<'a> MediaWriter<'a> {
-
     pub fn new(album_dir: &'a PathBuf) -> MediaWriter<'a> {
-        MediaWriter {
-            album_dir,
-        }
+        MediaWriter { album_dir }
     }
 
     pub fn write_media(&self, media: Vec<Media>, limit: u32) -> Result<u64> {
@@ -384,8 +398,11 @@ impl<'a> MediaWriter<'a> {
         let path = PathBuf::from(self.album_dir);
         let mut i = 0;
         let mut written = 0;
-        let to_display = if limit == u32::MAX { String::from("∞") }
-            else { limit.to_string() };
+        let to_display = if limit == u32::MAX {
+            String::from("∞")
+        } else {
+            limit.to_string()
+        };
         let iter = rx.iter();
         for next in iter {
             let batch_result = next.iter().fold(0, |accum, media| {
@@ -395,7 +412,7 @@ impl<'a> MediaWriter<'a> {
                 print!("[{}/{}]\t", i + 1, to_display);
                 i += 1;
                 let result = self.write_file(&mut path.clone(), media).unwrap();
-                return accum + result
+                return accum + result;
             });
             written += batch_result;
         }
@@ -405,7 +422,10 @@ impl<'a> MediaWriter<'a> {
 
     fn write_file(&self, pathbuf: &mut PathBuf, media: &Media) -> Result<u64> {
         let created_on = NaiveDateTime::parse_from_str(
-            media.media_metadata.creation_time.as_str(), "%Y-%m-%dT%H:%M:%S%Z").unwrap();
+            media.media_metadata.creation_time.as_str(),
+            "%Y-%m-%dT%H:%M:%S%Z",
+        )
+        .unwrap();
         // println!("created_on {}", created_on);
         let year = created_on.year().to_string();
         pathbuf.push(&year);
@@ -420,7 +440,7 @@ impl<'a> MediaWriter<'a> {
         // println!("path={:?}", pathbuf.as_path());
         if pathbuf.exists() {
             return Ok(0);
-        } 
+        }
         let mut file = File::create(pathbuf.as_path()).unwrap();
         let download_url = format!("{}=d", media.base_url);
         match reqwest::blocking::get(&download_url) {
@@ -434,13 +454,12 @@ impl<'a> MediaWriter<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
     use std::fs;
-    use std::path::PathBuf;
     use std::path::Path;
+    use std::path::PathBuf;
     use tempfile::tempdir;
 
     use crate::YearMonthDay;
@@ -489,15 +508,13 @@ mod tests {
 
     #[test]
     fn test_extract_code() {
-        let result = extract_code("http://127.0.0.1:7878/?code=abcdefg&scope=some_scope")
-            .unwrap();
+        let result = extract_code("http://127.0.0.1:7878/?code=abcdefg&scope=some_scope").unwrap();
         assert_eq!("abcdefg", result)
     }
 
     #[test]
     fn test_extract_code_at_end() {
-        let result = extract_code("http://127.0.0.1:7878/?scope=some_scope&code=abcdefg")
-            .unwrap();
+        let result = extract_code("http://127.0.0.1:7878/?scope=some_scope&code=abcdefg").unwrap();
         assert_eq!("abcdefg", result)
     }
 
